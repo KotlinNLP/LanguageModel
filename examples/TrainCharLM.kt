@@ -19,24 +19,29 @@ import java.io.File
  *
  * The first argument is the corpus file path.
  * The second argument is the filename in which to save the model.
+ * The presence of a third parameter indicates whether to train in reverse mode.
  */
 fun main(args: Array<String>) {
 
   val corpusFilePath = args[0]
   val modelFileName = args[1]
-
+  val reverse: Boolean = args.size > 2
   val charsDict = DictionarySet<Char>()
 
   charsDict.collectChars(corpus = File(corpusFilePath), maxSentences = 50000)
 
+  println("Collected ${charsDict.size} characters.")
+
+  if (reverse) println("Train the reverse model.")
+
   val model = CharLM(
-    reverseModel = true,
+    reverseModel = reverse,
     charsDict = charsDict,
     inputSize = 20,
     inputDropout = 0.0,
-    recurrentHiddenSize = 300,
+    recurrentHiddenSize = 100,
     recurrentHiddenDropout = 0.0,
-    recurrentConnectionType = LayerType.Connection.RAN,
+    recurrentConnectionType = LayerType.Connection.LSTM,
     recurrentHiddenActivation = Tanh(),
     recurrentLayers = 1)
 
