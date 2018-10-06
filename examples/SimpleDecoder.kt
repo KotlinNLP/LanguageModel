@@ -11,7 +11,8 @@ import com.kotlinnlp.simplednn.core.neuralprocessor.recurrent.RecurrentNeuralPro
 import com.kotlinnlp.simplednn.simplemath.ndarray.dense.DenseNDArray
 
 /**
- * A simple decoder that uses a CharLM language model to generates a sequence of characters starting given the first one.
+ * A simple decoder that uses a CharLM language model to generates a sequence of characters starting from a first
+ * input sequence.
  *
  * @param model the model
  */
@@ -34,30 +35,43 @@ class SimpleDecoder(private val model: CharLM) {
     propagateToInput = false)
 
   /**
-   * @param firstChar the first character of the sequence
+   * @param input the first characters of the sequence
    * @param maxSentenceLength the max number of character of the output sequence
    *
    * @return the predicted sequence
    */
-  fun decode(firstChar: Char, maxSentenceLength: Int): String {
+  fun decode(input: String, maxSentenceLength: Int): String {
 
-    val sentence = StringBuffer()
-    var curChar = firstChar
+    val sentence = StringBuffer(input)
 
-    loop@ for (i in 0 until maxSentenceLength) {
+    this.initSequence(input)
 
-      sentence.append(curChar)
+    var nextChar: Char = this.classifierProcessor.forward(this.recurrentProcessor.getOutput(copy = false)).let {
+      this.model.getChar(it.argMaxIndex(exceptIndex = this.model.eosId))
+    }
 
-      val bestId = this.forward(curChar, firstState = i == 0).argMaxIndex()
+    loop@ for (i in 0 until maxSentenceLength - input.length) {
+
+      sentence.append(nextChar)
+
+      val bestId = this.forward(nextChar, firstState = false).argMaxIndex()
 
       if (bestId == model.eosId)
         break@loop // end-of-sentence
       else
-        curChar = model.getChar(bestId)
+        nextChar = model.getChar(bestId)
     }
 
     return sentence.toString()
   }
+
+  /**
+   * Process the [input] with the recurrent processor.
+   *
+   * @param input the first characters of the sequence
+   */
+  private fun initSequence(input: String) = this.recurrentProcessor.forward(
+    input.map { this.model.charsEmbeddings.get(it).array.values })
 
   /**
    * @param c the input character

@@ -29,7 +29,7 @@ fun main(args: Array<String>) {
     if (inputText.isEmpty())
       break
     else
-      println(decoder.decode(firstChar = inputText[0], maxSentenceLength = maxSentenceLength))
+      println(decoder.decode(input = inputText, maxSentenceLength = maxSentenceLength))
   }
 
   println("\nExiting...")
@@ -42,7 +42,7 @@ fun main(args: Array<String>) {
  */
 private fun readValue(): String {
 
-  print("\nType a single character (empty to exit): ")
+  print("\nType the beginning of the sequence. Even a single character (empty to exit): ")
 
   return readLine()!!
 }
