@@ -1,4 +1,4 @@
-# LanguageModel
+# LanguageModel [![GitHub version](https://badge.fury.io/gh/KotlinNLP%2FLanguageModel.svg)](https://badge.fury.io/gh/KotlinNLP%2FLanguageModel) [![Build Status](https://travis-ci.org/KotlinNLP/LanguageModel.svg?branch=master)](https://travis-ci.org/KotlinNLP/LanguageModel)
 
 LanguageModel contains a number of methods for language modeling based on the [SimpleDNN](https://github.com/kotlinnlp/SimpleDNN "SimpleDNN on GitHub") library.
  
