@@ -1,7 +1,3 @@
-### Configuration ###
-config/*
-!config/configuration.yaml.example
-
 ### Intellij ###
 .idea/
 /out/
