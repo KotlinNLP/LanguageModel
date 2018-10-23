@@ -9,6 +9,7 @@ import com.kotlinnlp.languagemodel.CharLM
 import com.kotlinnlp.simplednn.core.neuralprocessor.feedforward.FeedforwardNeuralProcessor
 import com.kotlinnlp.simplednn.core.neuralprocessor.recurrent.RecurrentNeuralProcessor
 import com.kotlinnlp.simplednn.simplemath.ndarray.dense.DenseNDArray
+import java.lang.Math.random
 
 /**
  * A simple decoder that uses a CharLM language model to generates a sequence of characters starting from a first
@@ -47,22 +48,36 @@ class SimpleDecoder(private val model: CharLM) {
     this.initSequence(input)
 
     var nextChar: Char = this.classifierProcessor.forward(this.recurrentProcessor.getOutput(copy = false)).let {
-      this.model.getChar(it.argMaxIndex(exceptIndex = this.model.eosId))
+      this.model.getChar(it.argMaxIndex(exceptIndex = this.model.etxCharId))
     }
 
-    loop@ for (i in 0 until maxSentenceLength - input.length) {
+    while (sentence.length <= maxSentenceLength && !this.model.isEndOfSentence(nextChar)) {
 
       sentence.append(nextChar)
 
-      val bestId = this.forward(nextChar, firstState = false).argMaxIndex()
+      val distribution = this.forward(nextChar, firstState = false).toDoubleArray()
 
-      if (bestId == model.eosId)
-        break@loop // end-of-sentence
-      else
-        nextChar = model.getChar(bestId)
+      nextChar = this.model.getChar(distribution.weightedRandomChoice())
     }
 
     return sentence.toString()
+  }
+
+
+  /**
+   * Perform a random generation of the indices of the array with the probability defined in the array itself.
+   *
+   * @return an index of the array
+   */
+  private fun DoubleArray.weightedRandomChoice(): Int {
+
+    val prob: Double = random()
+    var sum = 0.0
+
+    return this.indexOfFirst {
+      sum += it
+      sum > prob
+    }
   }
 
   /**
