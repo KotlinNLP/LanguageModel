@@ -7,6 +7,7 @@
 
 package com.kotlinnlp.languagemodel.training
 
+import com.kotlinnlp.languagemodel.CharLM
 import com.kotlinnlp.utils.DictionarySet
 import java.io.BufferedReader
 import java.io.File
@@ -14,7 +15,7 @@ import java.io.FileInputStream
 import java.io.InputStreamReader
 
 /**
- * @param maxSentences the max number of sentences to read
+ * @param maxSentences the max number of sentences to read (can be null)
  */
 fun File.forEachIndexedSentence(maxSentences: Int? = null, callback: (Int, String) -> Unit) {
 
@@ -31,11 +32,29 @@ fun File.forEachIndexedSentence(maxSentences: Int? = null, callback: (Int, Strin
 }
 
 /**
- *
+ * @param destination where to collect the chars
+ * @param maxSentences the max number of sentences to read (can be null)
  */
-fun DictionarySet<Char>.collectChars(corpus: File, maxSentences: Int) {
+fun File.collectChars(destination: DictionarySet<Char>, maxSentences: Int? = null) {
 
-  corpus.forEachIndexedSentence(maxSentences) { _, line ->
-    line.forEach { this.add(it) }
+  this.forEachIndexedSentence(maxSentences) { _, line ->
+
+    if (line.contains(CharLM.ETX) || line.contains(CharLM.UNK)) {
+      throw RuntimeException("The line can't contain NULL or ETX chars")
+    }
+
+    line.forEach { destination.add(it) }
   }
+}
+
+/**
+ * Add the special chars used to identify the unknown and the end of the sentence.
+ */
+fun DictionarySet<Char>.addSpecialChars() {
+
+  require(!this.contains(CharLM.UNK))
+  require(!this.contains(CharLM.ETX))
+
+  this.add(CharLM.UNK)
+  this.add(CharLM.ETX)
 }

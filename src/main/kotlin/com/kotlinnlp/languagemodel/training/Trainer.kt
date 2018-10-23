@@ -116,6 +116,10 @@ class Trainer(
    */
   private fun trainSentence(sentence: String) {
 
+    if (sentence.contains(CharLM.ETX) || sentence.contains(CharLM.UNK)) {
+      throw RuntimeException("The String can't contain NULL or ETX chars")
+    }
+
     val prediction = this.processor.forward(sentence)
 
     val expectedOutput: List<DenseNDArray> = this.getExpectedCharsSequence(sentence).map {
@@ -138,7 +142,7 @@ class Trainer(
     }
 
     this.processor.backward(errors)
-    this.optimizer.accumulate(processor.getParamsErrors(copy = false))
+    this.optimizer.accumulate(this.processor.getParamsErrors(copy = false))
   }
 
   /**
@@ -156,7 +160,7 @@ class Trainer(
    * @return the expected output sequence
    */
   private fun getExpectedCharsSequence(s: String): List<Int> = (0 until s.length).map { i ->
-    if (i < s.lastIndex) this.model.getCharId(s[i + 1]) else model.eosId
+    if (i < s.lastIndex) this.model.getCharId(s[i + 1]) else this.model.etxCharId
   }
 
   /**

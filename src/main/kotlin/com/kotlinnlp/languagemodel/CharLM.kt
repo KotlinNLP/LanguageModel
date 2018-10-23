@@ -66,9 +66,14 @@ class CharLM(
     private const val serialVersionUID: Long = 1L
 
     /**
-     * Replacement character used to display an "unknown character".
+     * The char used for unknown chars.
      */
-    const val REPLACEMENT_CHARACTER: Char = 65533.toChar()
+    const val UNK: Char = 0.toChar()
+
+    /**
+     * The char used to identify the end of text.
+     */
+    const val ETX = 3.toChar()
 
     /**
      * Read a [CharLM] (serialized) from an input stream and decode it.
@@ -131,19 +136,19 @@ class CharLM(
   val classifierOutputSize: Int = this.charsDict.size
 
   /**
-   * The Id of the unknown char.
-   */
-  val unknownCharId = this.charsDict.size // lastIndex + 1
-
-  /**
-   * The Id that indicates the End-Of-Sequence.
-   */
-  val eosId = this.charsDict.size + 1 // lastIndex + 2
-
-  /**
    * Contains the aggregated parameters.
    */
   val params: RecurrentClassifierParameters
+
+  /**
+   * The id of the [UNK] char in the dictionary.
+   */
+  private val unkCharId: Int by lazy { this.charsDict.getId(UNK)!! }
+
+  /**
+   * The id of the [ETX] char in the dictionary.
+   */
+  val etxCharId: Int by lazy { this.charsDict.getId(ETX)!! }
 
   init {
 
@@ -172,7 +177,7 @@ class CharLM(
         size = this.recurrentNetwork.outputSize,
         type = LayerType.Input.Dense),
       LayerInterface(
-        size = this.classifierOutputSize + 2, // + last + unknown
+        size = this.classifierOutputSize,
         activationFunction = Softmax(),
         connectionType = LayerType.Connection.Feedforward),
       weightsInitializer = weightsInitializer,
@@ -182,8 +187,8 @@ class CharLM(
       recurrentParams = this.recurrentNetwork.model,
       classifierParams = this.classifier.model)
 
-    this.charsDict.getElements().forEach {
-      this.charsEmbeddings.set(it)
+    this.charsDict.getElements().forEach { char ->
+      if (char != ETX) this.charsEmbeddings.set(char)
     }
   }
 
@@ -192,14 +197,19 @@ class CharLM(
    *
    * @return the id of the char [c] in the dictionary (or the unknown-id if it does not exist)
    */
-  fun getCharId(c: Char): Int = this.charsDict.getId(c) ?: this.unknownCharId
+  fun getCharId(c: Char): Int = this.charsDict.getId(c) ?: this.unkCharId
 
   /**
    * @param id an id
    *
-   * @return the char corresponding to the [id] (or the replacement char if it does not exist in the dictionary)
+   * @return the char corresponding to the [id]
    */
-  fun getChar(id: Int): Char = this.charsDict.getElement(id) ?: REPLACEMENT_CHARACTER
+  fun getChar(id: Int): Char = this.charsDict.getElement(id)!!
+
+  /**
+   *
+   */
+  fun isEndOfSentence(c: Char): Boolean = c == ETX
 
   /**
    * Serialize this [CharLM] and write it to an output stream.
