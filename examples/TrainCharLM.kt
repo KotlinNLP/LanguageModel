@@ -7,6 +7,7 @@
 
 import com.kotlinnlp.languagemodel.CharLM
 import com.kotlinnlp.languagemodel.training.Trainer
+import com.kotlinnlp.languagemodel.training.addSpecialChars
 import com.kotlinnlp.languagemodel.training.collectChars
 import com.kotlinnlp.simplednn.core.functionalities.activations.Tanh
 import com.kotlinnlp.simplednn.core.functionalities.updatemethods.adam.ADAMMethod
@@ -24,11 +25,12 @@ import java.io.File
 fun main(args: Array<String>) {
 
   val corpusFilePath = args[0]
-  val modelFileName = args[1]
   val reverse: Boolean = args.size > 2
+  val modelFileName = args[1] + if (reverse) ".rev" else ""
   val charsDict = DictionarySet<Char>()
 
-  charsDict.collectChars(corpus = File(corpusFilePath), maxSentences = 50000)
+  File(corpusFilePath).collectChars(charsDict, maxSentences = 100000)
+  charsDict.addSpecialChars()
 
   println("Collected ${charsDict.size} characters.")
 
@@ -37,9 +39,9 @@ fun main(args: Array<String>) {
   val model = CharLM(
     reverseModel = reverse,
     charsDict = charsDict,
-    inputSize = 20,
+    inputSize = 25,
     inputDropout = 0.0,
-    recurrentHiddenSize = 100,
+    recurrentHiddenSize = 200,
     recurrentHiddenDropout = 0.0,
     recurrentConnectionType = LayerType.Connection.LSTM,
     recurrentHiddenActivation = Tanh(),
@@ -49,7 +51,7 @@ fun main(args: Array<String>) {
     model = model,
     modelFilename = modelFileName,
     corpusFilePath = corpusFilePath,
-    epochs = 10,
+    epochs = 1,
     updateMethod = ADAMMethod(stepSize = 0.001, beta1 = 0.9, beta2 = 0.999),
     verbose = true)
 
