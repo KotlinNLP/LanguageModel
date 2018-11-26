@@ -11,13 +11,16 @@ import com.kotlinnlp.simplednn.core.arrays.UpdatableArray
 import com.kotlinnlp.simplednn.core.embeddings.EmbeddingsMap
 import com.kotlinnlp.simplednn.core.functionalities.activations.ActivationFunction
 import com.kotlinnlp.simplednn.core.functionalities.activations.Softmax
+import com.kotlinnlp.simplednn.core.functionalities.initializers.ConstantInitializer
 import com.kotlinnlp.simplednn.core.functionalities.initializers.GlorotInitializer
 import com.kotlinnlp.simplednn.core.functionalities.initializers.Initializer
 import com.kotlinnlp.simplednn.core.layers.LayerInterface
 import com.kotlinnlp.simplednn.core.layers.LayerType
+import com.kotlinnlp.simplednn.core.layers.models.recurrent.lstm.LSTMLayerParameters
 import com.kotlinnlp.simplednn.core.neuralnetwork.NetworkParameters
 import com.kotlinnlp.simplednn.core.neuralnetwork.NeuralNetwork
 import com.kotlinnlp.simplednn.core.optimizer.IterableParams
+import com.kotlinnlp.simplednn.simplemath.ndarray.dense.DenseNDArray
 import com.kotlinnlp.utils.DictionarySet
 import com.kotlinnlp.utils.Serializer
 import java.io.InputStream
@@ -171,6 +174,10 @@ class CharLM(
       layerConfiguration = *layersConfiguration.toTypedArray(),
       weightsInitializer = weightsInitializer,
       biasesInitializer = biasesInitializer)
+
+    (this.recurrentNetwork.model.paramsPerLayer.last() as LSTMLayerParameters).let { params ->
+      ConstantInitializer(1.0).initialize(params.forgetGate.biases.values as DenseNDArray) // Gers et al. (2000)
+    }
 
     this.classifier = NeuralNetwork(
       LayerInterface(
