@@ -175,9 +175,7 @@ class CharLM(
       weightsInitializer = weightsInitializer,
       biasesInitializer = biasesInitializer)
 
-    (this.recurrentNetwork.model.paramsPerLayer.last() as LSTMLayerParameters).let { params ->
-      ConstantInitializer(1.0).initialize(params.forgetGate.biases.values as DenseNDArray) // Gers et al. (2000)
-    }
+    (this.recurrentNetwork.model.paramsPerLayer.last() as? LSTMLayerParameters)?.initForgetGateBiasToOne()
 
     this.classifier = NeuralNetwork(
       LayerInterface(
