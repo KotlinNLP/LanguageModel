@@ -9,7 +9,6 @@ import com.kotlinnlp.languagemodel.CharLM
 import com.kotlinnlp.simplednn.core.neuralprocessor.feedforward.FeedforwardNeuralProcessor
 import com.kotlinnlp.simplednn.core.neuralprocessor.recurrent.RecurrentNeuralProcessor
 import com.kotlinnlp.simplednn.simplemath.ndarray.dense.DenseNDArray
-import java.lang.Math.random
 
 /**
  * A simple decoder that uses a CharLM language model to generates a sequence of characters starting from a first
@@ -85,8 +84,8 @@ class SimpleDecoder(private val model: CharLM) {
    *
    * @param input the first characters of the sequence
    */
-  private fun initSequence(input: String) = this.recurrentProcessor.forward(
-    input.map { this.model.charsEmbeddings.get(it).array.values })
+  private fun initSequence(input: String) =
+    this.recurrentProcessor.forward(input.map { this.model.charsEmbeddings[it].array.values })
 
   /**
    * @param c the input character
@@ -97,5 +96,5 @@ class SimpleDecoder(private val model: CharLM) {
   private fun forward(c: Char, firstState: Boolean): DenseNDArray =
     this.classifierProcessor.forward(
       this.recurrentProcessor.forward(
-        this.model.charsEmbeddings.get(c).array.values, firstState))
+        this.model.charsEmbeddings[c].array.values, firstState))
 }

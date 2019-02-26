@@ -77,7 +77,7 @@ internal class Processor(
    */
   override fun forward(input: String): List<DenseNDArray> {
 
-    this.lastCharsEmbeddings = input.map { c -> this.model.charsEmbeddings.get(c) }
+    this.lastCharsEmbeddings = input.map { c -> this.model.charsEmbeddings[c] }
 
     return this.classifierProcessor.forward(
       this.recurrentProcessor.forward(this.lastCharsEmbeddings.map { it.array.values })) // TODO: copy?
