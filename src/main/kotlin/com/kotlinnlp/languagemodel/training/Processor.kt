@@ -46,7 +46,7 @@ internal class Processor(
    * The recurrent processor.
    */
   private val recurrentProcessor = RecurrentNeuralProcessor<DenseNDArray>(
-    neuralNetwork = model.recurrentNetwork,
+    model = this.model.recurrentNetwork,
     useDropout = this.useDropout,
     propagateToInput = true)
 
@@ -54,7 +54,7 @@ internal class Processor(
    * The feed-forward processor.
    */
   private val classifierProcessor = BatchFeedforwardProcessor<DenseNDArray>(
-    neuralNetwork = model.classifier,
+    model = this.model.classifier,
     useDropout = this.useDropout,
     propagateToInput = true)
 

@@ -11,16 +11,13 @@ import com.kotlinnlp.simplednn.core.arrays.UpdatableArray
 import com.kotlinnlp.simplednn.core.embeddings.EmbeddingsMap
 import com.kotlinnlp.simplednn.core.functionalities.activations.ActivationFunction
 import com.kotlinnlp.simplednn.core.functionalities.activations.Softmax
-import com.kotlinnlp.simplednn.core.functionalities.initializers.ConstantInitializer
 import com.kotlinnlp.simplednn.core.functionalities.initializers.GlorotInitializer
 import com.kotlinnlp.simplednn.core.functionalities.initializers.Initializer
 import com.kotlinnlp.simplednn.core.layers.LayerInterface
 import com.kotlinnlp.simplednn.core.layers.LayerType
 import com.kotlinnlp.simplednn.core.layers.models.recurrent.lstm.LSTMLayerParameters
-import com.kotlinnlp.simplednn.core.neuralnetwork.NetworkParameters
-import com.kotlinnlp.simplednn.core.neuralnetwork.NeuralNetwork
+import com.kotlinnlp.simplednn.core.layers.StackedLayersParameters
 import com.kotlinnlp.simplednn.core.optimizer.IterableParams
-import com.kotlinnlp.simplednn.simplemath.ndarray.dense.DenseNDArray
 import com.kotlinnlp.utils.DictionarySet
 import com.kotlinnlp.utils.Serializer
 import java.io.InputStream
@@ -95,8 +92,8 @@ class CharLM(
    * @property classifierParams network parameters of the feed-forward neural network
    */
   class RecurrentClassifierParameters(
-    val recurrentParams: NetworkParameters,
-    val classifierParams: NetworkParameters
+    val recurrentParams: StackedLayersParameters,
+    val classifierParams: StackedLayersParameters
   ) : IterableParams<RecurrentClassifierParameters>() {
 
     /**
@@ -126,12 +123,12 @@ class CharLM(
   /**
    * The Recurrent Network to process the sequence left-to-right, or right-to-left if [reverseModel].
    */
-  val recurrentNetwork: NeuralNetwork
+  val recurrentNetwork: StackedLayersParameters
 
   /**
    * The Feed-forward Network to predict the next char of the sequence.
    */
-  val classifier: NeuralNetwork
+  val classifier: StackedLayersParameters
 
   /**
    * The output size of the classifier.
@@ -170,14 +167,14 @@ class CharLM(
         dropout = recurrentHiddenDropout
       )})
 
-    this.recurrentNetwork = NeuralNetwork(
-      layerConfiguration = *layersConfiguration.toTypedArray(),
+    this.recurrentNetwork = StackedLayersParameters(
+      layersConfiguration = *layersConfiguration.toTypedArray(),
       weightsInitializer = weightsInitializer,
       biasesInitializer = biasesInitializer)
 
-    (this.recurrentNetwork.model.paramsPerLayer.last() as? LSTMLayerParameters)?.initForgetGateBiasToOne()
+    (this.recurrentNetwork.paramsPerLayer.last() as? LSTMLayerParameters)?.initForgetGateBiasToOne()
 
-    this.classifier = NeuralNetwork(
+    this.classifier = StackedLayersParameters(
       LayerInterface(
         size = this.recurrentNetwork.outputSize,
         type = LayerType.Input.Dense),
@@ -189,8 +186,8 @@ class CharLM(
       biasesInitializer = biasesInitializer)
 
     this.params = RecurrentClassifierParameters(
-      recurrentParams = this.recurrentNetwork.model,
-      classifierParams = this.classifier.model)
+      recurrentParams = this.recurrentNetwork,
+      classifierParams = this.classifier)
 
     this.charsDict.getElements().forEach { char ->
       if (char != ETX) this.charsEmbeddings.set(char)

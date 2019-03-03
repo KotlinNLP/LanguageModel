@@ -22,7 +22,7 @@ class SimpleDecoder(private val model: CharLM) {
    * The recurrent processor used to process a character at time.
    */
   private val recurrentProcessor = RecurrentNeuralProcessor<DenseNDArray>(
-    neuralNetwork = model.recurrentNetwork,
+    model = model.recurrentNetwork,
     useDropout = false,
     propagateToInput = false)
 
@@ -30,7 +30,7 @@ class SimpleDecoder(private val model: CharLM) {
    * The classifier that predict the next character of the sequence.
    */
   private val classifierProcessor = FeedforwardNeuralProcessor<DenseNDArray>(
-    neuralNetwork = model.classifier,
+    model = model.classifier,
     useDropout = false,
     propagateToInput = false)
 
