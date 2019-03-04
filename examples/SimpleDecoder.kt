@@ -54,14 +54,13 @@ class SimpleDecoder(private val model: CharLM) {
 
       sentence.append(nextChar)
 
-      val distribution = this.forward(nextChar, firstState = false).toDoubleArray()
+      val distribution = this.forward(nextChar, firstState = false)
 
-      nextChar = this.model.getChar(distribution.weightedRandomChoice())
+      nextChar = this.model.getChar(distribution.toDoubleArray().weightedRandomChoice())
     }
 
     return sentence.toString()
   }
-
 
   /**
    * Perform a random generation of the indices of the array with the probability defined in the array itself.
@@ -70,12 +69,11 @@ class SimpleDecoder(private val model: CharLM) {
    */
   private fun DoubleArray.weightedRandomChoice(): Int {
 
-    val prob: Double = random()
-    var sum = 0.0
+    var prob = this.reduce { a, b -> a + b } * Math.random()
 
-    return this.indexOfFirst {
-      sum += it
-      sum > prob
+    return this.indexOfFirst { a ->
+      prob -= a
+      prob < 0
     }
   }
 
