@@ -10,6 +10,7 @@ package com.kotlinnlp.languagemodel.training
 import com.kotlinnlp.languagemodel.CharLM
 import com.kotlinnlp.simplednn.core.functionalities.losses.SoftmaxCrossEntropyCalculator
 import com.kotlinnlp.simplednn.core.functionalities.updatemethods.UpdateMethod
+import com.kotlinnlp.simplednn.core.optimizer.ParamsOptimizer
 import com.kotlinnlp.simplednn.simplemath.ndarray.dense.DenseNDArray
 import com.kotlinnlp.simplednn.simplemath.ndarray.dense.DenseNDArrayFactory
 import com.kotlinnlp.simplednn.utils.scheduling.BatchScheduling
@@ -54,7 +55,7 @@ class Trainer(
   /**
    * Used to update the [CharLM] parameters based on the backward errors.
    */
-  private val optimizer = Optimizer(this.model, updateMethod = this.updateMethod)
+  private val optimizer = ParamsOptimizer(updateMethod = this.updateMethod)
 
   /**
    * Check requirements.

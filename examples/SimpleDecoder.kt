@@ -83,7 +83,7 @@ class SimpleDecoder(private val model: CharLM) {
    * @param input the first characters of the sequence
    */
   private fun initSequence(input: String) =
-    this.recurrentProcessor.forward(input.map { this.model.charsEmbeddings[it].array.values })
+    this.recurrentProcessor.forward(input.map { this.model.charsEmbeddings[it].values })
 
   /**
    * @param c the input character
@@ -94,5 +94,5 @@ class SimpleDecoder(private val model: CharLM) {
   private fun forward(c: Char, firstState: Boolean): DenseNDArray =
     this.classifierProcessor.forward(
       this.recurrentProcessor.forward(
-        this.model.charsEmbeddings[c].array.values, firstState))
+        this.model.charsEmbeddings[c].values, firstState))
 }

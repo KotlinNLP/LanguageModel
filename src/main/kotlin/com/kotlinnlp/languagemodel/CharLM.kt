@@ -7,7 +7,7 @@
 
 package com.kotlinnlp.languagemodel
 
-import com.kotlinnlp.simplednn.core.arrays.UpdatableArray
+import com.kotlinnlp.simplednn.core.arrays.ParamsArray
 import com.kotlinnlp.simplednn.core.embeddings.EmbeddingsMap
 import com.kotlinnlp.simplednn.core.functionalities.activations.ActivationFunction
 import com.kotlinnlp.simplednn.core.functionalities.activations.Softmax
@@ -46,16 +46,16 @@ import java.io.Serializable
 class CharLM(
   val reverseModel: Boolean = false,
   private val charsDict: DictionarySet<Char>,
-  inputSize: Int = 20,
-  inputDropout: Double = 0.0,
-  recurrentHiddenSize: Int = 100,
-  recurrentHiddenDropout: Double = 0.0,
-  recurrentConnectionType: LayerType.Connection,
-  recurrentHiddenActivation: ActivationFunction?,
-  recurrentLayers: Int,
+  private val inputSize: Int = 20,
+  private val inputDropout: Double = 0.0,
+  private val recurrentHiddenSize: Int = 100,
+  private val recurrentHiddenDropout: Double = 0.0,
+  private val recurrentConnectionType: LayerType.Connection,
+  private val recurrentHiddenActivation: ActivationFunction?,
+  private val recurrentLayers: Int,
   weightsInitializer: Initializer? = GlorotInitializer(),
   biasesInitializer: Initializer? = null
-) : Serializable {
+) : IterableParams<CharLM>(), Serializable {
 
   companion object {
 
@@ -86,36 +86,6 @@ class CharLM(
   }
 
   /**
-   * The CharLM contains the parameter of its sub-networks.
-   *
-   * @property recurrentParams network parameters of the recurrent neural network
-   * @property classifierParams network parameters of the feed-forward neural network
-   */
-  class RecurrentClassifierParameters(
-    val recurrentParams: StackedLayersParameters,
-    val classifierParams: StackedLayersParameters
-  ) : IterableParams<RecurrentClassifierParameters>() {
-
-    /**
-     * The list of all parameters.
-     */
-    override val paramsList: List<UpdatableArray<*>> = this.buildParamsList()
-
-    /**
-     * @return a new copy of all parameters of this
-     */
-    override fun copy() = RecurrentClassifierParameters(
-      recurrentParams = this.recurrentParams.copy(),
-      classifierParams = this.classifierParams.copy())
-
-    /**
-     * @return the list with parameters of all layers
-     */
-    private fun buildParamsList(): List<UpdatableArray<*>> =
-      this.recurrentParams.paramsList + this.classifierParams.paramsList
-  }
-
-  /**
    * The chars embeddings.
    */
   val charsEmbeddings = EmbeddingsMap<Char>(size = inputSize)
@@ -136,9 +106,9 @@ class CharLM(
   val classifierOutputSize: Int = this.charsDict.size
 
   /**
-   * Contains the aggregated parameters.
+   * The list of all parameters.
    */
-  val params: RecurrentClassifierParameters
+  override val paramsList: List<ParamsArray>
 
   /**
    * The id of the [UNK] char in the dictionary.
@@ -185,9 +155,7 @@ class CharLM(
       weightsInitializer = weightsInitializer,
       biasesInitializer = biasesInitializer)
 
-    this.params = RecurrentClassifierParameters(
-      recurrentParams = this.recurrentNetwork,
-      classifierParams = this.classifier)
+    this.paramsList = this.recurrentNetwork.paramsList + this.classifier.paramsList
 
     this.charsDict.getElements().forEach { char ->
       if (char != ETX) this.charsEmbeddings.set(char)
@@ -219,4 +187,21 @@ class CharLM(
    * @param outputStream the [OutputStream] in which to write this serialized [CharLM]
    */
   fun dump(outputStream: OutputStream) = Serializer.serialize(this, outputStream)
+
+  /**
+   * @return a new copy of all parameters of this
+   */
+  override fun copy(): CharLM = CharLM(
+    reverseModel = reverseModel,
+    charsDict = charsDict,
+    inputDropout = inputDropout,
+    inputSize = inputSize,
+    recurrentHiddenSize = recurrentHiddenSize,
+    recurrentHiddenDropout = recurrentHiddenDropout,
+    recurrentConnectionType = recurrentConnectionType,
+    recurrentHiddenActivation = recurrentHiddenActivation,
+    recurrentLayers = recurrentLayers,
+    weightsInitializer = null,
+    biasesInitializer = null
+  ).apply { assignValues(this) }
 }

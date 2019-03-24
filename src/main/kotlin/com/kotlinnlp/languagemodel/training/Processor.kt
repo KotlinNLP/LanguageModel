@@ -8,11 +8,11 @@
 package com.kotlinnlp.languagemodel.training
 
 import com.kotlinnlp.languagemodel.CharLM
-import com.kotlinnlp.simplednn.core.arrays.UpdatableDenseArray
-import com.kotlinnlp.simplednn.core.embeddings.Embedding
+import com.kotlinnlp.simplednn.core.arrays.ParamsArray
 import com.kotlinnlp.simplednn.core.neuralprocessor.NeuralProcessor
 import com.kotlinnlp.simplednn.core.neuralprocessor.batchfeedforward.BatchFeedforwardProcessor
 import com.kotlinnlp.simplednn.core.neuralprocessor.recurrent.RecurrentNeuralProcessor
+import com.kotlinnlp.simplednn.core.optimizer.ParamsErrorsAccumulator
 import com.kotlinnlp.simplednn.simplemath.ndarray.dense.DenseNDArray
 
 /**
@@ -28,8 +28,7 @@ internal class Processor(
   String, // InputType
   List<DenseNDArray>, // OutputType
   List<DenseNDArray>, // ErrorsType
-  NeuralProcessor.NoInputErrors, // InputErrorsType
-  ParamsErrors // ParamsErrors
+  NeuralProcessor.NoInputErrors // InputErrorsType
   > {
 
   /**
@@ -61,12 +60,12 @@ internal class Processor(
   /**
    * List of embeddings related to the last forward.
    */
-  private var lastCharsEmbeddings = listOf<Embedding>()
+  private var lastCharsEmbeddings = listOf<ParamsArray>()
 
   /**
    * List of embeddings errors related to the last backward.
    */
-  private var lastCharsEmbeddingsErrors = listOf<Embedding>()
+  private var lastCharsEmbeddingsErrors = ParamsErrorsAccumulator()
 
   /**
    * The Forward.
@@ -80,7 +79,7 @@ internal class Processor(
     this.lastCharsEmbeddings = input.map { c -> this.model.charsEmbeddings[c] }
 
     return this.classifierProcessor.forward(
-      this.recurrentProcessor.forward(this.lastCharsEmbeddings.map { it.array.values })) // TODO: copy?
+      this.recurrentProcessor.forward(this.lastCharsEmbeddings.map { it.values })) // TODO: copy?
   }
 
   /**
@@ -92,11 +91,24 @@ internal class Processor(
 
     this.classifierProcessor.backward(outputErrors)
     this.recurrentProcessor.backward(this.classifierProcessor.getInputErrors(copy = false))
+    this.backwardEmbeddings(this.recurrentProcessor.getInputErrors(copy = false))
+  }
 
-    this.lastCharsEmbeddingsErrors = this.recurrentProcessor.getInputErrors(copy = false)
-      .mapIndexed { charIndex, charErrors ->
-        Embedding(id = this.lastCharsEmbeddings[charIndex].id, array = UpdatableDenseArray(charErrors.copy()))
-      }
+  /**
+   * Propagate the given [errors] to the [lastCharsEmbeddings].
+   *
+   * @param errors the embeddings errors
+   */
+  private fun backwardEmbeddings(errors: List<DenseNDArray>) {
+
+    this.lastCharsEmbeddingsErrors.clear()
+
+    this.lastCharsEmbeddings.zip(errors).forEach { (charEmbedding, charErrors) ->
+
+      this.lastCharsEmbeddingsErrors.accumulate(charEmbedding, charErrors)
+    }
+
+    this.lastCharsEmbeddingsErrors.averageErrors()
   }
 
   /**
@@ -116,9 +128,8 @@ internal class Processor(
    *
    * @return the parameters errors
    */
-  override fun getParamsErrors(copy: Boolean) = ParamsErrors(
-    recurrentClassifier = CharLM.RecurrentClassifierParameters(
-      recurrentParams = this.recurrentProcessor.getParamsErrors(copy = false),
-      classifierParams = this.classifierProcessor.getParamsErrors(copy = false)),
-    embeddings = this.lastCharsEmbeddingsErrors)
+  override fun getParamsErrors(copy: Boolean) =
+    this.recurrentProcessor.getParamsErrors(copy = copy) +
+      this.classifierProcessor.getParamsErrors(copy = copy) +
+      this.lastCharsEmbeddingsErrors.getParamsErrors(copy = copy)
 }
