@@ -8,7 +8,10 @@
 import com.kotlinnlp.languagemodel.CharLM
 import com.kotlinnlp.simplednn.core.neuralprocessor.feedforward.FeedforwardNeuralProcessor
 import com.kotlinnlp.simplednn.core.neuralprocessor.recurrent.RecurrentNeuralProcessor
+import com.kotlinnlp.simplednn.simplemath.ndarray.Shape
 import com.kotlinnlp.simplednn.simplemath.ndarray.dense.DenseNDArray
+import com.kotlinnlp.simplednn.simplemath.ndarray.sparsebinary.SparseBinaryNDArray
+import com.kotlinnlp.simplednn.simplemath.ndarray.sparsebinary.SparseBinaryNDArrayFactory
 
 /**
  * A simple decoder that uses a CharLM language model to generates a sequence of characters starting from a first
@@ -21,7 +24,7 @@ class SimpleDecoder(private val model: CharLM) {
   /**
    * The recurrent processor used to process a character at time.
    */
-  private val recurrentProcessor = RecurrentNeuralProcessor<DenseNDArray>(
+  private val recurrentProcessor = RecurrentNeuralProcessor<SparseBinaryNDArray>(
     model = model.recurrentNetwork,
     useDropout = false,
     propagateToInput = false)
@@ -73,7 +76,7 @@ class SimpleDecoder(private val model: CharLM) {
 
     return this.indexOfFirst { a ->
       prob -= a
-      prob < 0
+      prob <= 0
     }
   }
 
@@ -83,7 +86,9 @@ class SimpleDecoder(private val model: CharLM) {
    * @param input the first characters of the sequence
    */
   private fun initSequence(input: String) =
-    this.recurrentProcessor.forward(input.map { this.model.charsEmbeddings[it].values })
+    this.recurrentProcessor.forward(input.map {          SparseBinaryNDArrayFactory.arrayOf(
+      shape = Shape(this.model.recurrentNetwork.inputSize),
+      activeIndices = listOf(this.model.charsDict.getId(it)!!)) })
 
   /**
    * @param c the input character
@@ -92,7 +97,11 @@ class SimpleDecoder(private val model: CharLM) {
    * @return the distribution of possible next character
    */
   private fun forward(c: Char, firstState: Boolean): DenseNDArray =
-    this.classifierProcessor.forward(
-      this.recurrentProcessor.forward(
-        this.model.charsEmbeddings[c].values, firstState))
+    this.classifierProcessor.forward(this.recurrentProcessor.forward(
+
+      input = SparseBinaryNDArrayFactory.arrayOf(
+        shape = Shape(this.model.recurrentNetwork.inputSize),
+        activeIndices = listOf(this.model.charsDict.getId(c)!!)),
+
+      firstState = firstState))
 }

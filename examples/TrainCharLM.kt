@@ -39,9 +39,9 @@ fun main(args: Array<String>) {
   val model = CharLM(
     reverseModel = reverse,
     charsDict = charsDict,
-    inputSize = 25,
+    inputSize = charsDict.size,
     inputDropout = 0.0,
-    recurrentHiddenSize = 200,
+    recurrentHiddenSize = 1000,
     recurrentHiddenDropout = 0.0,
     recurrentConnectionType = LayerType.Connection.LSTM,
     recurrentHiddenActivation = Tanh(),

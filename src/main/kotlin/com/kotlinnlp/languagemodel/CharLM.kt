@@ -8,7 +8,6 @@
 package com.kotlinnlp.languagemodel
 
 import com.kotlinnlp.simplednn.core.arrays.ParamsArray
-import com.kotlinnlp.simplednn.core.embeddings.EmbeddingsMap
 import com.kotlinnlp.simplednn.core.functionalities.activations.ActivationFunction
 import com.kotlinnlp.simplednn.core.functionalities.activations.Softmax
 import com.kotlinnlp.simplednn.core.functionalities.initializers.GlorotInitializer
@@ -45,8 +44,8 @@ import java.io.Serializable
  */
 class CharLM(
   val reverseModel: Boolean = false,
-  private val charsDict: DictionarySet<Char>,
-  private val inputSize: Int = 20,
+  val charsDict: DictionarySet<Char>,
+  private val inputSize: Int,
   private val inputDropout: Double = 0.0,
   private val recurrentHiddenSize: Int = 100,
   private val recurrentHiddenDropout: Double = 0.0,
@@ -86,11 +85,6 @@ class CharLM(
   }
 
   /**
-   * The chars embeddings.
-   */
-  val charsEmbeddings = EmbeddingsMap<Char>(size = inputSize)
-
-  /**
    * The Recurrent Network to process the sequence left-to-right, or right-to-left if [reverseModel].
    */
   val recurrentNetwork: StackedLayersParameters
@@ -127,7 +121,7 @@ class CharLM(
 
     val layersConfiguration = mutableListOf<LayerInterface>()
 
-    layersConfiguration.add(LayerInterface(size = inputSize, type = LayerType.Input.Dense, dropout = inputDropout))
+    layersConfiguration.add(LayerInterface(size = inputSize, type = LayerType.Input.SparseBinary, dropout = inputDropout))
 
     layersConfiguration.addAll((0 until recurrentLayers).map {
       LayerInterface(
@@ -156,10 +150,6 @@ class CharLM(
       biasesInitializer = biasesInitializer)
 
     this.paramsList = this.recurrentNetwork.paramsList + this.classifier.paramsList
-
-    this.charsDict.getElements().forEach { char ->
-      if (char != ETX) this.charsEmbeddings.set(char)
-    }
   }
 
   /**
