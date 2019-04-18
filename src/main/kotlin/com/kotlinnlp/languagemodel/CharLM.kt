@@ -76,6 +76,20 @@ class CharLM(
     const val ETX = 3.toChar()
 
     /**
+     * Add to the [dict] the special chars used to identify the unknown and the end of the sentence.
+     *
+     * @param dict the chars dictionary set
+     */
+    fun addSpecialChars(dict: DictionarySet<Char>) {
+
+      require(!dict.contains(CharLM.UNK))
+      require(!dict.contains(CharLM.ETX))
+
+      dict.add(CharLM.UNK)
+      dict.add(CharLM.ETX)
+    }
+
+    /**
      * Read a [CharLM] (serialized) from an input stream and decode it.
      *
      * @param inputStream the [InputStream] from which to read the serialized [CharLM]

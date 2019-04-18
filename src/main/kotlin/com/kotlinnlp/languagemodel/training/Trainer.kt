@@ -30,8 +30,7 @@ import kotlin.math.exp
  *
  * @param model the model
  * @param modelFilename where to save the serialized model
- * @param corpusFilePath where to find the corpus for training
- * @param maxSentences maximum number of sentences in the corpus to be used for training
+ * @param sentences the training sentences
  * @param epochs number of training epochs
  * @param updateMethod the update method (e.g. ADAM, AdaGrad, LearningRate
  * @param verbose whether to display info during the training
@@ -39,8 +38,7 @@ import kotlin.math.exp
 class Trainer(
   private val model: CharLM,
   private val modelFilename: String,
-  private val corpusFilePath: String,
-  private val maxSentences: Int? = null,
+  private val sentences: Sequence<String>,
   private val epochs: Int,
   private val updateMethod: UpdateMethod<*>,
   private val verbose: Boolean = true
@@ -67,7 +65,7 @@ class Trainer(
   private val avgPerplexity = MovingAverage()
 
   /**
-   *
+   * The lowest perplexity calculated during the training.
    */
   private var bestPerplexity: Double? = null
 
@@ -103,15 +101,19 @@ class Trainer(
    */
   private fun trainEpoch() {
 
-    File(this.corpusFilePath).forEachIndexedSentence(this.maxSentences) { i, sentence ->
+    this.sentences.forEachIndexed { i, sentence ->
 
       this.newBatch() // TODO: what is a batch here?
       this.newExample()
 
-      if (this.model.reverseModel)
-        this.trainSentence(sentence.reversed())
-      else
-        this.trainSentence(sentence)
+      val perplexity = this.trainSentence(
+        if (this.model.reverseModel)
+          sentence.reversed()
+        else
+          sentence
+      )
+
+      this.avgPerplexity.add(perplexity)
 
       this.optimizer.update() // optimize for each sentence
 
@@ -125,15 +127,7 @@ class Trainer(
         else
           println()
 
-        if (this.bestPerplexity == null || this.bestPerplexity!! > this.avgPerplexity.mean) {
-
-          this.bestPerplexity = this.avgPerplexity.mean
-
-          println("[NEW BEST PERPLEXITY!] Saving model...")
-
-          this.model.setAvgPerplexity(this.bestPerplexity!!)
-          this.model.dump(FileOutputStream(File(this.modelFilename)))
-        }
+        this.evaluateAndSaveModel()
 
       } else if (i % 10 == 0) {
         print(".")
@@ -142,11 +136,29 @@ class Trainer(
   }
 
   /**
+   * Evaluate and save the best model.
+   */
+  private fun evaluateAndSaveModel() {
+
+    if (this.bestPerplexity == null || this.bestPerplexity!! > this.avgPerplexity.mean) {
+
+      this.bestPerplexity = this.avgPerplexity.mean
+
+      println("[NEW BEST PERPLEXITY!] Saving model...")
+
+      this.model.setAvgPerplexity(this.bestPerplexity!!)
+      this.model.dump(FileOutputStream(File(this.modelFilename)))
+    }
+  }
+
+  /**
    * Train a single sentence.
    *
    * @param sentence the sentence
+   *
+   * @return the avg perplexity of the given [sentence]
    */
-  private fun trainSentence(sentence: String) {
+  private fun trainSentence(sentence: String): Double {
 
     if (sentence.contains(CharLM.ETX) || sentence.contains(CharLM.UNK)) {
       throw RuntimeException("The String can't contain NULL or ETX chars")
@@ -159,17 +171,16 @@ class Trainer(
       .map { i -> if (i == sentence.lastIndex) this.model.etxCharId else this.model.getCharId(sentence[i + 1]) }
       .map { charId -> DenseNDArrayFactory.oneHotEncoder(length = this.model.classifier.outputSize, oneAt = charId) }
 
-    val loss = prediction.zip(targets).map { (y, g) -> -safeLog(y[g.argMaxIndex()]) }.average()
-    val perplexity = exp(loss)
-
-    this.avgPerplexity.add(perplexity)
-
     val errors = SoftmaxCrossEntropyCalculator().calculateErrors(
       outputSequence = prediction,
       outputGoldSequence = targets)
 
     this.processor.backward(errors)
     this.optimizer.accumulate(this.processor.getParamsErrors(copy = false))
+
+    val loss = prediction.zip(targets).map { (y, g) -> -safeLog(y[g.argMaxIndex()]) }.average()
+
+    return exp(loss) // perplexity
   }
 
   /**

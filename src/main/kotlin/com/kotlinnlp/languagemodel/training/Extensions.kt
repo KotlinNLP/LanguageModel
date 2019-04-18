@@ -17,15 +17,21 @@ import java.io.InputStreamReader
 /**
  * @param maxSentences the max number of sentences to read (can be null)
  */
-fun File.forEachIndexedSentence(maxSentences: Int? = null, callback: (Int, String) -> Unit) {
+fun File.toSequence(maxSentences: Int? = null) = sequence<String> {
 
   var i = 0
 
-  this.walk().filter { it.isFile }.forEach { file ->
+  this@toSequence.walk().filter { it.isFile }.forEach { file ->
 
     BufferedReader(InputStreamReader(FileInputStream(file), Charsets.UTF_8)).lines().use {
+
       for (line in it) {
-        if (maxSentences == null || i < maxSentences) callback(i++, line) else break
+        if (maxSentences == null || i < maxSentences) {
+          i++
+          yield(line)
+        } else {
+          break
+        }
       }
     }
   }
@@ -37,7 +43,7 @@ fun File.forEachIndexedSentence(maxSentences: Int? = null, callback: (Int, Strin
  */
 fun File.collectChars(destination: DictionarySet<Char>, maxSentences: Int? = null) {
 
-  this.forEachIndexedSentence(maxSentences) { _, line ->
+  this.toSequence(maxSentences).forEach { line ->
 
     if (line.contains(CharLM.ETX) || line.contains(CharLM.UNK)) {
       throw RuntimeException("The line can't contain NULL or ETX chars")
@@ -45,16 +51,4 @@ fun File.collectChars(destination: DictionarySet<Char>, maxSentences: Int? = nul
 
     line.forEach { destination.add(it) }
   }
-}
-
-/**
- * Add the special chars used to identify the unknown and the end of the sentence.
- */
-fun DictionarySet<Char>.addSpecialChars() {
-
-  require(!this.contains(CharLM.UNK))
-  require(!this.contains(CharLM.ETX))
-
-  this.add(CharLM.UNK)
-  this.add(CharLM.ETX)
 }
