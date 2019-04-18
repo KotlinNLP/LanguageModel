@@ -106,6 +106,12 @@ class CharLM(
   val classifierOutputSize: Int = this.charsDict.size
 
   /**
+   * The average perplexity of the model, calculated during the training.
+   */
+  var avgPerplexity: Double = 0.0
+    private set
+
+  /**
    * The list of all parameters.
    */
   override val paramsList: List<ParamsArray>
@@ -177,7 +183,9 @@ class CharLM(
   fun getChar(id: Int): Char = this.charsDict.getElement(id)!!
 
   /**
+   * @param c a char
    *
+   * @return whether the given char [c] is the "end of text" character
    */
   fun isEndOfSentence(c: Char): Boolean = c == ETX
 
@@ -187,6 +195,11 @@ class CharLM(
    * @param outputStream the [OutputStream] in which to write this serialized [CharLM]
    */
   fun dump(outputStream: OutputStream) = Serializer.serialize(this, outputStream)
+
+  /**
+   * Set the average perplexity of the model.
+   */
+  fun setAvgPerplexity(value: Double) { this.avgPerplexity = value }
 
   /**
    * @return a new copy of all parameters of this
