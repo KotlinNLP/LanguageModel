@@ -27,8 +27,8 @@ import java.io.Serializable
 /**
  * The serializable model of the character language-model.
  *
- * This implementation uses the characters as atomic units of language modeling,allowing text to be treated as a
- * sequence of characters passed to an recurrent classifier network which at each point in the sequence is trained
+ * This implementation uses the characters as atomic units of language modeling, allowing text to be treated as a
+ * sequence of characters passed to a recurrent classifier which at each point in the sequence is trained
  * to predict the next character.
  *
  * @property reverseModel where to train the model by seeing the sequence reversed (default false)
