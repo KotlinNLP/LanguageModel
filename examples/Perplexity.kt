@@ -28,7 +28,7 @@ fun main(args: Array<String>) {
 
   while (true) {
 
-    val inputText = readValue()
+    val inputText = readValue().let { if (it.length == 1) " $it " else it}
 
     if (inputText.isEmpty()) {
 
