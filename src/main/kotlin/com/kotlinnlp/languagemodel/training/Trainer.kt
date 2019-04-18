@@ -15,8 +15,8 @@ import com.kotlinnlp.simplednn.core.neuralprocessor.batchfeedforward.BatchFeedfo
 import com.kotlinnlp.simplednn.core.neuralprocessor.embeddingsprocessor.EmbeddingsProcessor
 import com.kotlinnlp.simplednn.core.neuralprocessor.recurrent.RecurrentNeuralProcessor
 import com.kotlinnlp.simplednn.core.optimizer.ParamsOptimizer
-import com.kotlinnlp.simplednn.simplemath.ndarray.dense.DenseNDArray
 import com.kotlinnlp.simplednn.simplemath.ndarray.dense.DenseNDArrayFactory
+import com.kotlinnlp.simplednn.simplemath.safeLog
 import com.kotlinnlp.simplednn.utils.scheduling.BatchScheduling
 import com.kotlinnlp.simplednn.utils.scheduling.EpochScheduling
 import com.kotlinnlp.simplednn.utils.scheduling.ExampleScheduling
@@ -62,6 +62,16 @@ class Trainer(
   private val optimizer = ParamsOptimizer(updateMethod = this.updateMethod)
 
   /**
+   * The perplexity calculated during the training.
+   */
+  private val avgPerplexity = MovingAverage()
+
+  /**
+   *
+   */
+  private var bestPerplexity: Double? = null
+
+  /**
    * Check requirements.
    */
   init {
@@ -103,13 +113,30 @@ class Trainer(
       else
         this.trainSentence(sentence)
 
-      this.optimizer.update()
+      this.optimizer.update() // optimize for each sentence
 
-      if (i > 0 && i % 100 == 0) { // TODO: check best accuracy
+      if (i > 0 && i % 100 == 0) {
 
-        this.model.dump(FileOutputStream(File(this.modelFilename)))
+        print("\nAfter %d examples: perplexity mean = %.2f, variance = %.2f"
+          .format(i, this.avgPerplexity.mean, this.avgPerplexity.variance))
 
-        println("\n[$i] Model saved to \"${this.modelFilename}\"")
+        if (this.bestPerplexity != null)
+          println(" (former best = %.2f)".format(this.bestPerplexity))
+        else
+          println()
+
+        if (this.bestPerplexity == null || this.bestPerplexity!! > this.avgPerplexity.mean) {
+
+          this.bestPerplexity = this.avgPerplexity.mean
+
+          println("[NEW BEST PERPLEXITY!] Saving model...")
+
+          this.model.setAvgPerplexity(this.bestPerplexity!!)
+          this.model.dump(FileOutputStream(File(this.modelFilename)))
+        }
+
+      } else if (i % 10 == 0) {
+        print(".")
       }
     }
   }
@@ -127,45 +154,22 @@ class Trainer(
 
     val prediction = this.processor.forward(sentence.toList())
 
-    val expectedOutput: List<DenseNDArray> = this.getExpectedCharsSequence(sentence).map {
-      DenseNDArrayFactory.oneHotEncoder(length = this.model.classifier.outputSize, oneAt = it)
-    }
+    // The target is always the next character.
+    val targets = (0 until sentence.length)
+      .map { i -> if (i == sentence.lastIndex) this.model.etxCharId else this.model.getCharId(sentence[i + 1]) }
+      .map { charId -> DenseNDArrayFactory.oneHotEncoder(length = this.model.classifier.outputSize, oneAt = charId) }
+
+    val loss = prediction.zip(targets).map { (y, g) -> -safeLog(y[g.argMaxIndex()]) }.average()
+    val perplexity = exp(loss)
+
+    this.avgPerplexity.add(perplexity)
 
     val errors = SoftmaxCrossEntropyCalculator().calculateErrors(
       outputSequence = prediction,
-      outputGoldSequence = expectedOutput)
-
-    if (this.verbose) {
-
-      val loss = SoftmaxCrossEntropyCalculator().calculateMeanLoss(
-        outputSequence = prediction,
-        outputGoldSequence = expectedOutput)
-
-      val perplexity = this.calculatePerplexity(prediction)
-
-      println("Loss: $loss Perplexity: $perplexity") // TODO: print to improve
-    }
+      outputGoldSequence = targets)
 
     this.processor.backward(errors)
     this.optimizer.accumulate(this.processor.getParamsErrors(copy = false))
-  }
-
-  /**
-   *
-   */
-  private fun calculatePerplexity(prediction: List<DenseNDArray>): Double {
-
-    val x = prediction.sumByDouble { Math.log(it.max()) } / this.model.classifierOutputSize
-    return exp(-x)
-  }
-
-  /**
-   * @param s an input string
-   *
-   * @return the expected output sequence
-   */
-  private fun getExpectedCharsSequence(s: String): List<Int> = (0 until s.length).map { i ->
-    if (i < s.lastIndex) this.model.getCharId(s[i + 1]) else this.model.etxCharId
   }
 
   /**
