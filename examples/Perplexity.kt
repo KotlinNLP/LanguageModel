@@ -49,7 +49,6 @@ fun main(args: Array<String>) {
 
       println("Perplexity: $perplexity")
     }
-
   }
 
   println("\nExiting...")
