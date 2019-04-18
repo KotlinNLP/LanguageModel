@@ -29,7 +29,7 @@ fun main(args: Array<String>) {
   val modelFileName = args[1] + if (reverse) ".rev" else ""
   val charsDict = DictionarySet<Char>()
 
-  corpus.collectChars(charsDict, maxSentences = 100000)
+  corpus.toSequence(maxSentences = 100000).collectChars(charsDict)
 
   CharLM.addSpecialChars(charsDict)
 

@@ -39,11 +39,10 @@ fun File.toSequence(maxSentences: Int? = null) = sequence<String> {
 
 /**
  * @param destination where to collect the chars
- * @param maxSentences the max number of sentences to read (can be null)
  */
-fun File.collectChars(destination: DictionarySet<Char>, maxSentences: Int? = null) {
+fun Sequence<String>.collectChars(destination: DictionarySet<Char>) {
 
-  this.toSequence(maxSentences).forEach { line ->
+  this.forEach { line ->
 
     if (line.contains(CharLM.ETX) || line.contains(CharLM.UNK)) {
       throw RuntimeException("The line can't contain NULL or ETX chars")
