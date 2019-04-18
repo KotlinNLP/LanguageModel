@@ -11,6 +11,7 @@ import com.kotlinnlp.simplednn.core.neuralprocessor.batchfeedforward.BatchFeedfo
 import com.kotlinnlp.simplednn.core.neuralprocessor.embeddingsprocessor.EmbeddingsProcessor
 import com.kotlinnlp.simplednn.core.neuralprocessor.recurrent.RecurrentNeuralProcessor
 import com.kotlinnlp.simplednn.simplemath.ndarray.dense.DenseNDArrayFactory
+import com.kotlinnlp.simplednn.simplemath.safeLog
 import java.io.File
 import java.io.FileInputStream
 import kotlin.math.exp
@@ -83,12 +84,3 @@ private fun buildProcessor(model: CharLM) = ChainProcessor(
     useDropout = false,
     propagateToInput = false))
 
-/**
- * Simple work-around that make the Math.log() safe for zero or negative values
- *
- * @param value the value
- * @param eps the number to use when the given [value] is less than this
- *
- * @return the logarithm
- */
-fun safeLog(value: Double, eps: Double = 1.0e-08): Double = Math.log(if (value >= eps) value else eps)
