@@ -10,6 +10,10 @@ package com.kotlinnlp.languagemodel.training
 import com.kotlinnlp.languagemodel.CharLM
 import com.kotlinnlp.simplednn.core.functionalities.losses.SoftmaxCrossEntropyCalculator
 import com.kotlinnlp.simplednn.core.functionalities.updatemethods.UpdateMethod
+import com.kotlinnlp.simplednn.core.neuralprocessor.ChainProcessor
+import com.kotlinnlp.simplednn.core.neuralprocessor.batchfeedforward.BatchFeedforwardProcessor
+import com.kotlinnlp.simplednn.core.neuralprocessor.embeddingsprocessor.EmbeddingsProcessor
+import com.kotlinnlp.simplednn.core.neuralprocessor.recurrent.RecurrentNeuralProcessor
 import com.kotlinnlp.simplednn.core.optimizer.ParamsOptimizer
 import com.kotlinnlp.simplednn.simplemath.ndarray.dense.DenseNDArray
 import com.kotlinnlp.simplednn.simplemath.ndarray.dense.DenseNDArrayFactory
@@ -50,7 +54,7 @@ class Trainer(
   /**
    * The neural processor to train the [CharLM].
    */
-  private val processor = Processor(this.model, useDropout = true)
+  private val processor = buildProcessor()
 
   /**
    * Used to update the [CharLM] parameters based on the backward errors.
@@ -121,7 +125,7 @@ class Trainer(
       throw RuntimeException("The String can't contain NULL or ETX chars")
     }
 
-    val prediction = this.processor.forward(sentence)
+    val prediction = this.processor.forward(sentence.toList())
 
     val expectedOutput: List<DenseNDArray> = this.getExpectedCharsSequence(sentence).map {
       DenseNDArrayFactory.oneHotEncoder(length = this.model.classifier.outputSize, oneAt = it)
@@ -219,4 +223,21 @@ class Trainer(
       println("Elapsed time: %s".format(this.timer.formatElapsedTime()))
     }
   }
+
+  /**
+   * @return the processor to train the CharLM model
+   */
+  private fun buildProcessor() = ChainProcessor(
+    inputProcessor = EmbeddingsProcessor(
+      embeddingsMap = this.model.charsEmbeddings,
+      useDropout = true),
+    hiddenProcessors = listOf(
+      RecurrentNeuralProcessor(
+        model = this.model.recurrentNetwork,
+        useDropout = true,
+        propagateToInput = true)),
+    outputProcessor = BatchFeedforwardProcessor(
+      model = this.model.classifier,
+      useDropout = true,
+      propagateToInput = true))
 }

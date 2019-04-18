@@ -6,9 +6,10 @@
  * ------------------------------------------------------------------*/
 
 import com.kotlinnlp.languagemodel.CharLM
+import com.kotlinnlp.simplednn.core.neuralprocessor.ChainProcessor
 import com.kotlinnlp.simplednn.core.neuralprocessor.batchfeedforward.BatchFeedforwardProcessor
+import com.kotlinnlp.simplednn.core.neuralprocessor.embeddingsprocessor.EmbeddingsProcessor
 import com.kotlinnlp.simplednn.core.neuralprocessor.recurrent.RecurrentNeuralProcessor
-import com.kotlinnlp.simplednn.simplemath.ndarray.dense.DenseNDArray
 import com.kotlinnlp.simplednn.simplemath.ndarray.dense.DenseNDArrayFactory
 import java.io.File
 import java.io.FileInputStream
@@ -23,16 +24,7 @@ import kotlin.math.exp
 fun main(args: Array<String>) {
 
   val model = CharLM.load(FileInputStream(File(args[0])))
-
-  val recurrentProcessor = RecurrentNeuralProcessor<DenseNDArray>(
-    model = model.recurrentNetwork,
-    useDropout = false,
-    propagateToInput = false)
-
-  val classifierProcessor = BatchFeedforwardProcessor<DenseNDArray>(
-    model = model.classifier,
-    useDropout = false,
-    propagateToInput = false)
+  val processor = buildProcessor(model)
 
   while (true) {
 
@@ -44,14 +36,12 @@ fun main(args: Array<String>) {
 
     } else {
 
-      val prediction = classifierProcessor.forward(recurrentProcessor.forward(
-        inputText.take(inputText.length - 1).map { c -> model.charsEmbeddings[c].values }
-      ))
+      val prediction = processor.forward(inputText.take(inputText.length - 1).toList())
 
       // The target is always the next character.
       val targets = (0 until inputText.length - 1)
         .map { i -> model.getCharId(inputText[i + 1]) }
-        .map { DenseNDArrayFactory.oneHotEncoder(length = model.classifier.outputSize, oneAt = it) }
+        .map { charId -> DenseNDArrayFactory.oneHotEncoder(length = model.classifier.outputSize, oneAt = charId) }
 
       val loss = prediction.zip(targets).map { (y, g) -> -safeLog(y[g.argMaxIndex()]) }.average()
       val perplexity = exp(loss)
@@ -75,6 +65,23 @@ private fun readValue(): String {
 
   return readLine()!!
 }
+
+/**
+ * @return the processor to use the CharLM model
+ */
+private fun buildProcessor(model: CharLM) = ChainProcessor(
+  inputProcessor = EmbeddingsProcessor(
+    embeddingsMap = model.charsEmbeddings,
+    useDropout = false),
+  hiddenProcessors = listOf(
+    RecurrentNeuralProcessor(
+      model = model.recurrentNetwork,
+      useDropout = false,
+      propagateToInput = false)),
+  outputProcessor = BatchFeedforwardProcessor(
+    model = model.classifier,
+    useDropout = false,
+    propagateToInput = false))
 
 /**
  * Simple work-around that make the Math.log() safe for zero or negative values
