@@ -146,7 +146,7 @@ class Trainer(
 
       println("[NEW BEST PERPLEXITY!] Saving model...")
 
-      this.model.setAvgPerplexity(this.bestPerplexity!!)
+      this.model.avgPerplexity = this.bestPerplexity!!
       this.model.dump(FileOutputStream(File(this.modelFilename)))
     }
   }

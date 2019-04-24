@@ -123,7 +123,7 @@ class CharLM(
    * The average perplexity of the model, calculated during the training.
    */
   var avgPerplexity: Double = 0.0
-    private set
+    internal set
 
   /**
    * The list of all parameters.
@@ -209,11 +209,6 @@ class CharLM(
    * @param outputStream the [OutputStream] in which to write this serialized [CharLM]
    */
   fun dump(outputStream: OutputStream) = Serializer.serialize(this, outputStream)
-
-  /**
-   * Set the average perplexity of the model.
-   */
-  fun setAvgPerplexity(value: Double) { this.avgPerplexity = value }
 
   /**
    * @return a new copy of all parameters of this
