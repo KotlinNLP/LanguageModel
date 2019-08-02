@@ -7,7 +7,6 @@
 
 package com.kotlinnlp.languagemodel
 
-import com.kotlinnlp.simplednn.core.arrays.ParamsArray
 import com.kotlinnlp.simplednn.core.embeddings.EmbeddingsMap
 import com.kotlinnlp.simplednn.core.functionalities.activations.ActivationFunction
 import com.kotlinnlp.simplednn.core.functionalities.activations.Softmax
@@ -17,7 +16,6 @@ import com.kotlinnlp.simplednn.core.layers.LayerInterface
 import com.kotlinnlp.simplednn.core.layers.LayerType
 import com.kotlinnlp.simplednn.core.layers.models.recurrent.lstm.LSTMLayerParameters
 import com.kotlinnlp.simplednn.core.layers.StackedLayersParameters
-import com.kotlinnlp.simplednn.core.optimizer.IterableParams
 import com.kotlinnlp.utils.DictionarySet
 import com.kotlinnlp.utils.Serializer
 import java.io.InputStream
@@ -55,7 +53,7 @@ class CharLM(
   private val recurrentLayers: Int,
   weightsInitializer: Initializer? = GlorotInitializer(),
   biasesInitializer: Initializer? = null
-) : IterableParams<CharLM>(), Serializable {
+) : Serializable {
 
   companion object {
 
@@ -82,11 +80,11 @@ class CharLM(
      */
     fun addSpecialChars(dict: DictionarySet<Char>) {
 
-      require(!dict.contains(CharLM.UNK))
-      require(!dict.contains(CharLM.ETX))
+      require(!dict.contains(UNK))
+      require(!dict.contains(ETX))
 
-      dict.add(CharLM.UNK)
-      dict.add(CharLM.ETX)
+      dict.add(UNK)
+      dict.add(ETX)
     }
 
     /**
@@ -124,11 +122,6 @@ class CharLM(
    */
   var avgPerplexity: Double = 0.0
     internal set
-
-  /**
-   * The list of all parameters.
-   */
-  override val paramsList: List<ParamsArray>
 
   /**
    * The id of the [UNK] char in the dictionary.
@@ -175,8 +168,6 @@ class CharLM(
       weightsInitializer = weightsInitializer,
       biasesInitializer = biasesInitializer)
 
-    this.paramsList = this.recurrentNetwork.paramsList + this.classifier.paramsList
-
     this.charsDict.getElements().forEach { char ->
       if (char != ETX) this.charsEmbeddings.set(char)
     }
@@ -209,21 +200,4 @@ class CharLM(
    * @param outputStream the [OutputStream] in which to write this serialized [CharLM]
    */
   fun dump(outputStream: OutputStream) = Serializer.serialize(this, outputStream)
-
-  /**
-   * @return a new copy of all parameters of this
-   */
-  override fun copy(): CharLM = CharLM(
-    reverseModel = reverseModel,
-    charsDict = charsDict,
-    inputDropout = inputDropout,
-    inputSize = inputSize,
-    recurrentHiddenSize = recurrentHiddenSize,
-    recurrentHiddenDropout = recurrentHiddenDropout,
-    recurrentConnectionType = recurrentConnectionType,
-    recurrentHiddenActivation = recurrentHiddenActivation,
-    recurrentLayers = recurrentLayers,
-    weightsInitializer = null,
-    biasesInitializer = null
-  ).apply { assignValues(this) }
 }
