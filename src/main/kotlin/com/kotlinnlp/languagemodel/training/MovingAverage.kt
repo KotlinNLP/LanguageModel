@@ -13,7 +13,7 @@ package com.kotlinnlp.languagemodel.training
  *
  * @param windowSize the size of the observation window
  */
-class MovingAverage(private val windowSize: Int = 200) {
+class MovingAverage(private val windowSize: Int) {
 
   /**
    * The mean.

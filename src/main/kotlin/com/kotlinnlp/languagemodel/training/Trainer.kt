@@ -92,7 +92,7 @@ class Trainer(
   /**
    * The loss accumulated during the training.
    */
-  private val avgLoss = MovingAverage()
+  private val avgLoss = MovingAverage(200)
 
   /**
    * The lowest loss calculated during the training.
