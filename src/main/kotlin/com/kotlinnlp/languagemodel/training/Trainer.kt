@@ -220,7 +220,7 @@ class Trainer(
    */
   private fun trainBatch(batch: String, nextChar: Char?, isFirst: Boolean): Double {
 
-    val prediction: List<DenseNDArray> = this.outputProcessor.forward(
+    val predictions: List<DenseNDArray> = this.outputProcessor.forward(
       this.hiddenProcessors.forward(
         input = this.inputProcessor.forward(batch.toList()),
         initHiddens = if (isFirst) null else this.initHiddens))
@@ -235,8 +235,8 @@ class Trainer(
         oneAt = if (i == batch.lastIndex) lastCharId else this.model.getCharId(batch[i + 1]))
     }
 
-    val errors = SoftmaxCrossEntropyCalculator().calculateErrors(
-      outputSequence = prediction,
+    val errors: List<DenseNDArray> = SoftmaxCrossEntropyCalculator().calculateErrors(
+      outputSequence = predictions,
       outputGoldSequence = targets)
 
     this.inputProcessor.backward(
@@ -254,7 +254,7 @@ class Trainer(
 
     this.optimizer.accumulate(paramsErrors)
 
-    return prediction.zip(targets).map { (y, g) -> -safeLog(y[g.argMaxIndex()]) }.sum()
+    return predictions.zip(targets).map { (prediction, target) -> -safeLog(prediction[target.argMaxIndex()]) }.sum()
   }
 
   /**
