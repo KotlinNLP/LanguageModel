@@ -8,6 +8,7 @@
 package com.kotlinnlp.languagemodel.training
 
 import com.kotlinnlp.languagemodel.CharLM
+import com.kotlinnlp.simplednn.core.functionalities.gradientclipping.GradientClipping
 import com.kotlinnlp.simplednn.core.functionalities.losses.SoftmaxCrossEntropyCalculator
 import com.kotlinnlp.simplednn.core.functionalities.updatemethods.UpdateMethod
 import com.kotlinnlp.simplednn.core.neuralprocessor.batchfeedforward.BatchFeedforwardProcessor
@@ -34,6 +35,7 @@ import kotlin.math.exp
  * @param sentences the training sentences
  * @param epochs number of training epochs
  * @param batchSize the size of each characters batch
+ * @param gradientClipping the gradient clipper
  * @param updateMethod the update method (e.g. ADAM, AdaGrad, LearningRate
  * @param verbose whether to display info during the training
  */
@@ -43,6 +45,7 @@ class Trainer(
   private val sentences: Sequence<String>,
   private val epochs: Int,
   private val batchSize: Int,
+  private val gradientClipping: GradientClipping?,
   private val updateMethod: UpdateMethod<*>,
   private val verbose: Boolean = true
 ) {
@@ -79,7 +82,7 @@ class Trainer(
   /**
    * Used to update the [CharLM] parameters based on the backward errors.
    */
-  private val optimizer = ParamsOptimizer(updateMethod = this.updateMethod)
+  private val optimizer = ParamsOptimizer(updateMethod = this.updateMethod, gradientClipping = this.gradientClipping)
 
   /**
    *
