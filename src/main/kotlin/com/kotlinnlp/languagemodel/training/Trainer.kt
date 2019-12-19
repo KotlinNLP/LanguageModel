@@ -140,21 +140,28 @@ class Trainer(
         this.optimizer.update()
 
         if ((i + 1) % 100 == 0) {
-
-          print("\nAfter %d sentences: loss mean = %.2f, std dev = %.2f"
-            .format(i + 1, this.avgLoss.mean, this.avgLoss.stdDev))
-
-          if (this.bestLossMean != null)
-            println(" (former best = %.2f)".format(this.bestLossMean))
-          else
-            println()
-
+          this.printProgress(sentencesCount = i + 1)
           this.evaluateAndSaveModel()
-
         }
 
         if ((i + 1) % 10 == 0) print(".")
       }
+  }
+
+  /**
+   * Print the current progress.
+   *
+   * @param sentencesCount the number of sentences seen
+   */
+  private fun printProgress(sentencesCount: Int) {
+
+    print("\n[%s] After %d sentences: loss mean = %.2f, std dev = %.2f"
+      .format(this.timer.formatElapsedTime(), sentencesCount, this.avgLoss.mean, this.avgLoss.stdDev))
+
+    if (this.bestLossMean != null)
+      println(" (former best = %.2f)".format(this.bestLossMean))
+    else
+      println()
   }
 
   /**
