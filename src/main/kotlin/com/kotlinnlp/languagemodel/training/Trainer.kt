@@ -141,7 +141,7 @@ class Trainer(
 
         if ((i + 1) % 100 == 0) {
 
-          print("\nAfter %d examples: loss mean = %.2f, std dev = %.2f"
+          print("\nAfter %d sentences: loss mean = %.2f, std dev = %.2f"
             .format(i + 1, this.avgLoss.mean, this.avgLoss.stdDev))
 
           if (this.bestLossMean != null)
