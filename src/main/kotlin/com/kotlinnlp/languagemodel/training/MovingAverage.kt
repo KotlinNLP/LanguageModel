@@ -16,25 +16,7 @@ package com.kotlinnlp.languagemodel.training
 class MovingAverage(private val windowSize: Int) {
 
   /**
-   * The mean.
-   */
-  var mean: Double = 0.0
-    private set
-
-  /**
-   * The variance.
-   */
-  var variance: Double = 0.0
-    private set
-
-  /**
-   * The standard deviation.
-   */
-  var stdDev: Double = 0.0
-    private set
-
-  /**
-   * The values collected.
+   * The values collected within the observation window.
    */
   private val values: MutableList<Double> = mutableListOf()
 
@@ -48,9 +30,30 @@ class MovingAverage(private val windowSize: Int) {
     this.values.add(value)
 
     if (this.values.size > this.windowSize) this.values.removeAt(0)
-
-    this.mean = this.values.average()
-    this.variance = this.values.asSequence().map { (it - this.mean) * (it - this.mean) }.average()
-    this.stdDev = Math.sqrt(this.variance)
   }
+
+  /**
+   * @return the mean
+   */
+  fun calcMean(): Double = this.values.average()
+
+  /**
+   * @return the variance
+   */
+  fun calcVar(): Double {
+
+    val mean: Double = this.calcMean()
+
+    return this.values.asSequence()
+      .map {
+        val diff: Double = it - mean
+        diff * diff
+      }
+      .average()
+  }
+
+  /**
+   * @return the standard deviation
+   */
+  fun calcStdDev(): Double = Math.sqrt(this.calcVar())
 }

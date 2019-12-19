@@ -156,7 +156,7 @@ class Trainer(
   private fun printProgress(sentencesCount: Int) {
 
     print("\n[%s] After %d sentences: loss mean = %.2f, std dev = %.2f"
-      .format(this.timer.formatElapsedTime(), sentencesCount, this.avgLoss.mean, this.avgLoss.stdDev))
+      .format(this.timer.formatElapsedTime(), sentencesCount, this.avgLoss.calcMean(), this.avgLoss.calcStdDev()))
 
     if (this.bestLossMean != null)
       println(" (former best = %.2f)".format(this.bestLossMean))
@@ -169,9 +169,11 @@ class Trainer(
    */
   private fun evaluateAndSaveModel() {
 
-    if (this.bestLossMean == null || this.avgLoss.mean < this.bestLossMean!!) {
+    val lossMean: Double = this.avgLoss.calcMean()
 
-      this.bestLossMean = this.avgLoss.mean
+    if (this.bestLossMean == null || lossMean < this.bestLossMean!!) {
+
+      this.bestLossMean = lossMean
 
       println("[NEW BEST PERPLEXITY!] Saving model...")
 
