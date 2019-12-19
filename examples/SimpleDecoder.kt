@@ -43,56 +43,44 @@ class SimpleDecoder(private val model: CharLM) {
   fun decode(input: String, maxSentenceLength: Int): String {
 
     val sentence = StringBuffer(input)
+    var nextChar: Char = this.initSequence(input)
 
-    this.initSequence(input)
-
-    var nextChar: Char = this.classifierProcessor.forward(this.recurrentProcessor.getOutput(copy = false)).let {
-      this.model.getChar(it.argMaxIndex(exceptIndex = this.model.etxCharId))
-    }
-
-    while (sentence.length <= maxSentenceLength && !this.model.isEndOfSentence(nextChar)) {
+    while (sentence.length < maxSentenceLength && !this.model.isEndOfSentence(nextChar)) {
 
       sentence.append(nextChar)
 
-      val distribution = this.forward(nextChar, firstState = false)
-
-      nextChar = this.model.getChar(distribution.toDoubleArray().weightedRandomChoice())
+      nextChar = this.predictNextChar(nextChar)
     }
 
     return sentence.toString()
   }
 
   /**
-   * Perform a random generation of the indices of the array with the probability defined in the array itself.
-   *
-   * @return an index of the array
-   */
-  private fun DoubleArray.weightedRandomChoice(): Int {
-
-    var prob = this.reduce { a, b -> a + b } * Math.random()
-
-    return this.indexOfFirst { a ->
-      prob -= a
-      prob < 0
-    }
-  }
-
-  /**
    * Process the [input] with the recurrent processor.
    *
    * @param input the first characters of the sequence
+   *
+   * @return the next char predicted
    */
-  private fun initSequence(input: String) =
-    this.recurrentProcessor.forward(input.map { this.model.charsEmbeddings[it].values })
+  private fun initSequence(input: String): Char {
+
+    val charEmbeddings: List<DenseNDArray> = input.map { this.model.charsEmbeddings[it].values }
+    val prediction: DenseNDArray = this.recurrentProcessor.forward(charEmbeddings).last()
+
+    return this.model.getChar(prediction.argMaxIndex())
+  }
 
   /**
-   * @param c the input character
-   * @param firstState whether this is the first prediction to build a new sequence
+   * @param lastChar the last char predicted
    *
-   * @return the distribution of possible next character
+   * @return the next char predicted
    */
-  private fun forward(c: Char, firstState: Boolean): DenseNDArray =
-    this.classifierProcessor.forward(
-      this.recurrentProcessor.forward(
-        this.model.charsEmbeddings[c].values, firstState))
+  private fun predictNextChar(lastChar: Char): Char {
+
+    val lastCharEmbedding: DenseNDArray = this.model.charsEmbeddings[lastChar].values
+    val distribution: DenseNDArray = this.classifierProcessor.forward(
+      this.recurrentProcessor.forward(lastCharEmbedding, firstState = false))
+
+    return this.model.getChar(distribution.argMaxIndex())
+  }
 }
