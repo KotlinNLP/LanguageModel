@@ -53,6 +53,7 @@ fun main(args: Array<String>) {
     modelFilename = modelFileName,
     sentences = corpus.toSequence(),
     batchSize = 50,
+    gradientClipping = null,
     epochs = 1,
     updateMethod = ADAMMethod(stepSize = 0.001, beta1 = 0.9, beta2 = 0.999),
     verbose = true)
