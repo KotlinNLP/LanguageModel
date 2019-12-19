@@ -34,6 +34,7 @@ fun main(args: Array<String>) {
   CharLM.addSpecialChars(charsDict)
 
   println("Dictionary size: ${charsDict.size}")
+  println("Number of training sentences: ${corpus.toSequence().count()}")
 
   if (reverse) println("Train the reverse model.")
 
