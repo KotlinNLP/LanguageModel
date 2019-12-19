@@ -8,11 +8,12 @@
 package com.kotlinnlp.languagemodel.training
 
 /**
- * Compute the moving average giving more importance to the recent added values.
- *
+ * Compute the moving average giving more importance to the recent added values. *
  * TODO: move to KotlinNLP/Utils
+ *
+ * @param windowSize the size of the observation window
  */
-class MovingAverage {
+class MovingAverage(private val windowSize: Int = 200) {
 
   /**
    * The mean.
@@ -27,10 +28,15 @@ class MovingAverage {
     private set
 
   /**
-   * Counts the added values.
+   * The standard deviation.
    */
-  var count: Long = 0
+  var stdDev: Double = 0.0
     private set
+
+  /**
+   * The values collected.
+   */
+  private val values: MutableList<Double> = mutableListOf()
 
   /**
    * Add the given [value] to the moving average
@@ -39,8 +45,12 @@ class MovingAverage {
    */
   fun add(value: Double) {
 
-    this.count++
-    this.mean += (2.0 / this.count) * (value - this.mean)
-    this.variance += (2.0 / this.count) * ((value - this.mean) * (value - this.mean) - this.variance)
+    this.values.add(value)
+
+    if (this.values.size > this.windowSize) this.values.removeAt(0)
+
+    this.mean = this.values.average()
+    this.variance = this.values.asSequence().map { (it - this.mean) * (it - this.mean) }.average()
+    this.stdDev = Math.sqrt(this.variance)
   }
 }
