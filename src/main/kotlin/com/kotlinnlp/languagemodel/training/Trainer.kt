@@ -87,14 +87,14 @@ class Trainer(
   private lateinit var initHiddens: List<List<DenseNDArray>>
 
   /**
-   * The perplexity calculated during the training.
+   * The loss accumulated during the training.
    */
-  private val avgPerplexity = MovingAverage()
+  private val avgLoss = MovingAverage()
 
   /**
-   * The lowest perplexity calculated during the training.
+   * The lowest loss calculated during the training.
    */
-  private var bestPerplexity: Double? = null
+  private var bestLossMean: Double? = null
 
   /**
    * Check requirements.
@@ -132,32 +132,25 @@ class Trainer(
       .filter { it.isNotEmpty() }
       .forEachIndexed { i, sentence ->
 
-        val perplexity = this.trainSentence(
-          if (this.model.reverseModel)
-            sentence.reversed()
-          else
-            sentence
-        )
+        this.trainSentence(sentence = if (this.model.reverseModel) sentence.reversed() else sentence)
 
-        this.avgPerplexity.add(perplexity)
+        this.optimizer.update()
 
-        this.optimizer.update() // optimize for each sentence
+        if ((i + 1) % 100 == 0) {
 
-        if (i > 0 && i % 100 == 0) {
+          print("\nAfter %d examples: loss mean = %.2f, std dev = %.2f"
+            .format(i + 1, this.avgLoss.mean, this.avgLoss.stdDev))
 
-          print("\nAfter %d examples: perplexity mean = %.2f, variance = %.2f"
-            .format(i, this.avgPerplexity.mean, this.avgPerplexity.variance))
-
-          if (this.bestPerplexity != null)
-            println(" (former best = %.2f)".format(this.bestPerplexity))
+          if (this.bestLossMean != null)
+            println(" (former best = %.2f)".format(this.bestLossMean))
           else
             println()
 
           this.evaluateAndSaveModel()
 
-        } else if (i % 10 == 0) {
-          print(".")
         }
+
+        if ((i + 1) % 10 == 0) print(".")
       }
   }
 
@@ -166,13 +159,13 @@ class Trainer(
    */
   private fun evaluateAndSaveModel() {
 
-    if (this.bestPerplexity == null || this.bestPerplexity!! > this.avgPerplexity.mean) {
+    if (this.bestLossMean == null || this.avgLoss.mean < this.bestLossMean!!) {
 
-      this.bestPerplexity = this.avgPerplexity.mean
+      this.bestLossMean = this.avgLoss.mean
 
       println("[NEW BEST PERPLEXITY!] Saving model...")
 
-      this.model.avgPerplexity = this.bestPerplexity!!
+      this.model.avgPerplexity = exp(this.bestLossMean!!)
       this.model.dump(FileOutputStream(File(this.modelFilename)))
     }
   }
@@ -181,16 +174,13 @@ class Trainer(
    * Train a single sentence.
    *
    * @param sentence the sentence
-   *
-   * @return the avg perplexity of the given [sentence]
    */
-  private fun trainSentence(sentence: String): Double {
+  private fun trainSentence(sentence: String) {
 
     if (sentence.contains(CharLM.ETX) || sentence.contains(CharLM.UNK)) {
       throw RuntimeException("The String can't contain NULL or ETX chars")
     }
 
-    var loss = 0.0
     var start = 0
 
     while (start < sentence.length) {
@@ -201,12 +191,10 @@ class Trainer(
       this.newBatch()
       this.newExample()
 
-      loss += this.trainBatch(batch = sentence.substring(start, end), nextChar = nextChar, isFirst = start == 0)
+      this.trainBatch(batch = sentence.substring(start, end), nextChar = nextChar, isFirst = start == 0)
 
       start = end
     }
-
-    return exp(loss / sentence.length) // perplexity
   }
 
   /**
@@ -215,10 +203,8 @@ class Trainer(
    * @param batch a characters batch
    * @param nextChar the char that follows the batch or null if the batch is the last of the sentence
    * @param isFirst whether it is the first batch
-   *
-   * @return the negative logarithmic loss accumulated during the training of the given [batch]
    */
-  private fun trainBatch(batch: String, nextChar: Char?, isFirst: Boolean): Double {
+  private fun trainBatch(batch: String, nextChar: Char?, isFirst: Boolean) {
 
     val predictions: List<DenseNDArray> = this.outputProcessor.forward(
       this.hiddenProcessors.forward(
@@ -254,7 +240,9 @@ class Trainer(
 
     this.optimizer.accumulate(paramsErrors)
 
-    return predictions.zip(targets).map { (prediction, target) -> -safeLog(prediction[target.argMaxIndex()]) }.sum()
+    predictions.zip(targets).forEach { (prediction, target) ->
+      this.avgLoss.add(-safeLog(prediction[target.argMaxIndex()]))
+    }
   }
 
   /**
