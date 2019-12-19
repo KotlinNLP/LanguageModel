@@ -132,9 +132,6 @@ class Trainer(
       .filter { it.isNotEmpty() }
       .forEachIndexed { i, sentence ->
 
-        this.newBatch() // TODO: what is a batch here?
-        this.newExample()
-
         val perplexity = this.trainSentence(
           if (this.model.reverseModel)
             sentence.reversed()
@@ -200,6 +197,9 @@ class Trainer(
 
       val end: Int = Math.min(start + this.batchSize, sentence.length)
       val nextChar: Char? = if (end < sentence.length) sentence[end] else null
+
+      this.newBatch()
+      this.newExample()
 
       loss += this.trainBatch(batch = sentence.substring(start, end), nextChar = nextChar, isFirst = start == 0)
 
