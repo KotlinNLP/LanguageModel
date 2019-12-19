@@ -25,8 +25,8 @@ import java.io.File
 fun main(args: Array<String>) {
 
   val corpus = File(args[0])
+  val modelFileName = args[1]
   val reverse: Boolean = args.size > 2
-  val modelFileName = args[1] + if (reverse) ".rev" else ""
   val charsDict = DictionarySet<Char>()
 
   corpus.toSequence(maxSentences = 100000).collectChars(charsDict)
