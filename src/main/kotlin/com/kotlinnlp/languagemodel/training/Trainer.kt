@@ -199,8 +199,9 @@ class Trainer(
     while (start < sentence.length) {
 
       val end: Int = Math.min(start + this.batchSize, sentence.length)
+      val nextChar: Char? = if (end < sentence.length) sentence[end] else null
 
-      loss += this.trainBatch(batch = sentence.substring(start, end), isFirst = start == 0)
+      loss += this.trainBatch(batch = sentence.substring(start, end), nextChar = nextChar, isFirst = start == 0)
 
       start = end
     }
@@ -212,11 +213,12 @@ class Trainer(
    * Train a batch of characters.
    *
    * @param batch a characters batch
+   * @param nextChar the char that follows the batch or null if the batch is the last of the sentence
    * @param isFirst whether it is the first batch
    *
    * @return the negative logarithmic loss accumulated during the training of the given [batch]
    */
-  private fun trainBatch(batch: String, isFirst: Boolean): Double {
+  private fun trainBatch(batch: String, nextChar: Char?, isFirst: Boolean): Double {
 
     val prediction: List<DenseNDArray> = this.outputProcessor.forward(
       this.hiddenProcessors.forward(
@@ -226,9 +228,12 @@ class Trainer(
     this.initHiddens = this.hiddenProcessors.map { it.getCurState(copy = true)!! }
 
     // The target is always the next character.
-    val targets: List<DenseNDArray> = (0 until batch.length)
-      .map { i -> if (i == batch.lastIndex) this.model.etxCharId else this.model.getCharId(batch[i + 1]) }
-      .map { charId -> DenseNDArrayFactory.oneHotEncoder(length = this.model.classifier.outputSize, oneAt = charId) }
+    val lastCharId: Int = nextChar?.let { this.model.getCharId(nextChar)} ?: this.model.etxCharId
+    val targets: List<DenseNDArray> = (0 until batch.length).map { i ->
+      DenseNDArrayFactory.oneHotEncoder(
+        length = this.model.classifier.outputSize,
+        oneAt = if (i == batch.lastIndex) lastCharId else this.model.getCharId(batch[i + 1]))
+    }
 
     val errors = SoftmaxCrossEntropyCalculator().calculateErrors(
       outputSequence = prediction,
