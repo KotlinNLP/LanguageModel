@@ -58,7 +58,7 @@
         <kotlin.version>1.3.31</kotlin.version>
         <dokka.version>0.9.16</dokka.version>
         <simplednn.version>0.13.3</simplednn.version>
-        <utils.version>2.1.3</utils.version>
+        <utils.version>2.1.4</utils.version>
     </properties>
 
     <repositories>
