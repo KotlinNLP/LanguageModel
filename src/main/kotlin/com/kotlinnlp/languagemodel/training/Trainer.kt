@@ -23,6 +23,7 @@ import com.kotlinnlp.simplednn.utils.scheduling.BatchScheduling
 import com.kotlinnlp.simplednn.utils.scheduling.EpochScheduling
 import com.kotlinnlp.simplednn.utils.scheduling.ExampleScheduling
 import com.kotlinnlp.utils.Timer
+import com.kotlinnlp.utils.stats.MovingAverage
 import java.io.File
 import java.io.FileOutputStream
 import kotlin.math.exp
