@@ -64,8 +64,9 @@ class SimpleDecoder(private val model: CharLM) {
    */
   private fun initSequence(input: String): Char {
 
-    val charEmbeddings: List<DenseNDArray> = input.map { this.model.charsEmbeddings[it].values }
-    val prediction: DenseNDArray = this.recurrentProcessor.forward(charEmbeddings).last()
+    val charsEmbeddings: List<DenseNDArray> = input.map { this.model.charsEmbeddings[it].values }
+    val prediction: DenseNDArray = this.classifierProcessor.forward(
+      this.recurrentProcessor.forward(charsEmbeddings).last())
 
     return this.model.getChar(prediction.argMaxIndex())
   }
@@ -78,9 +79,9 @@ class SimpleDecoder(private val model: CharLM) {
   private fun predictNextChar(lastChar: Char): Char {
 
     val lastCharEmbedding: DenseNDArray = this.model.charsEmbeddings[lastChar].values
-    val distribution: DenseNDArray = this.classifierProcessor.forward(
+    val prediction: DenseNDArray = this.classifierProcessor.forward(
       this.recurrentProcessor.forward(lastCharEmbedding, firstState = false))
 
-    return this.model.getChar(distribution.argMaxIndex())
+    return this.model.getChar(prediction.argMaxIndex())
   }
 }
