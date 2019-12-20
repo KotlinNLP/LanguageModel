@@ -10,6 +10,7 @@ import com.kotlinnlp.languagemodel.training.Trainer
 import com.kotlinnlp.languagemodel.training.collectChars
 import com.kotlinnlp.languagemodel.training.toSequence
 import com.kotlinnlp.simplednn.core.functionalities.activations.Tanh
+import com.kotlinnlp.simplednn.core.functionalities.gradientclipping.GradientClipping
 import com.kotlinnlp.simplednn.core.functionalities.updatemethods.adam.ADAMMethod
 import com.kotlinnlp.simplednn.core.layers.LayerType
 import com.kotlinnlp.utils.DictionarySet
@@ -53,8 +54,8 @@ fun main(args: Array<String>) {
     modelFilename = modelFileName,
     sentences = corpus.toSequence(),
     batchSize = 50,
-    charsDropout = 0.0,
-    gradientClipping = null,
+    charsDropout = 0.25,
+    gradientClipping = GradientClipping.byValue(0.25),
     epochs = 1,
     updateMethod = ADAMMethod(stepSize = 0.001, beta1 = 0.9, beta2 = 0.999),
     verbose = true)
