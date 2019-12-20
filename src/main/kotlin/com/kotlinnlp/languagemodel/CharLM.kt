@@ -32,7 +32,6 @@ import java.io.Serializable
  * @property reverseModel where to train the model by seeing the sequence reversed (default false)
  * @param charsDict the dictionary containing the known characters (used both for embeddings and for prediction output)
  * @param inputSize the input size
- * @param inputDropout the input dropout (used during training only, default 0.0)
  * @param recurrentHiddenSize the size of the recurrent hidden layers
  * @param recurrentHiddenDropout the dropout of the recurrent hidden layers (used during training only, default 0.0)
  * @param recurrentConnectionType the recurrent connection type (e.g. LSTM, GRU, RAN)
@@ -45,7 +44,6 @@ class CharLM(
   val reverseModel: Boolean = false,
   private val charsDict: DictionarySet<Char>,
   private val inputSize: Int = 20,
-  private val inputDropout: Double = 0.0,
   private val recurrentHiddenSize: Int = 100,
   private val recurrentHiddenDropout: Double = 0.0,
   private val recurrentConnectionType: LayerType.Connection,
@@ -140,7 +138,7 @@ class CharLM(
 
     val layersConfiguration = mutableListOf<LayerInterface>()
 
-    layersConfiguration.add(LayerInterface(size = inputSize, type = LayerType.Input.Dense, dropout = inputDropout))
+    layersConfiguration.add(LayerInterface(size = inputSize, type = LayerType.Input.Dense))
 
     layersConfiguration.addAll((0 until recurrentLayers).map {
       LayerInterface(

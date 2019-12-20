@@ -70,16 +70,8 @@ private fun readValue(): String {
  * @return the processor to use the CharLM model
  */
 private fun buildProcessor(model: CharLM) = ChainProcessor(
-  inputProcessor = EmbeddingsProcessor(
-    embeddingsMap = model.charsEmbeddings,
-    useDropout = false),
+  inputProcessor = EmbeddingsProcessor(embeddingsMap = model.charsEmbeddings),
   hiddenProcessors = listOf(
-    RecurrentNeuralProcessor(
-      model = model.recurrentNetwork,
-      useDropout = false,
-      propagateToInput = false)),
-  outputProcessor = BatchFeedforwardProcessor(
-    model = model.classifier,
-    useDropout = false,
-    propagateToInput = false))
+    RecurrentNeuralProcessor(model = model.recurrentNetwork, useDropout = false, propagateToInput = false)),
+  outputProcessor = BatchFeedforwardProcessor(model = model.classifier, useDropout = false, propagateToInput = false))
 
