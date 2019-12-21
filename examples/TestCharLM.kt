@@ -20,7 +20,7 @@ fun main(args: Array<String>) {
   val model = CharLM.load(FileInputStream(File(args[0])))
   val maxSentenceLength: Int = if (args.size > 1) args[1].toInt() else 100
 
-  val decoder = SimpleDecoder(model)
+  val decoder = RandomWeightedChoiceDecoder(model)
 
   while (true) {
 

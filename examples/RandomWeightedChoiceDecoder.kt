@@ -11,12 +11,12 @@ import com.kotlinnlp.simplednn.core.neuralprocessor.recurrent.RecurrentNeuralPro
 import com.kotlinnlp.simplednn.simplemath.ndarray.dense.DenseNDArray
 
 /**
- * A simple decoder that uses a CharLM language model to generates a sequence of characters starting from a first
- * input sequence.
+ * Generate texts from a starting sequence of chars, choosing the following chars with a random weighted choice based
+ * on the prediction of a characters based language model.
  *
- * @param model the model
+ * @param model a char language model
  */
-class SimpleDecoder(private val model: CharLM) {
+class RandomWeightedChoiceDecoder(private val model: CharLM) {
 
   /**
    * The recurrent processor used to process a character at time.
@@ -82,6 +82,12 @@ class SimpleDecoder(private val model: CharLM) {
     val prediction: DenseNDArray = this.classifierProcessor.forward(
       this.recurrentProcessor.forward(lastCharEmbedding, firstState = false))
 
-    return this.model.getChar(prediction.argMaxIndex())
+    var prob: Double = Math.random()
+    val charIndex: Int = prediction.toDoubleArray().indexOfFirst { x ->
+      prob -= x
+      prob < 0
+    }
+
+    return this.model.getChar(charIndex)
   }
 }
