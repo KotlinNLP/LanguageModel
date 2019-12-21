@@ -51,7 +51,7 @@ fun main(args: Array<String>) {
   val trainer = Trainer(
     model = model,
     modelFilename = modelFileName,
-    sentences = corpus.toSequence(),
+    sentences = corpus.toSequence(reverse = reverse),
     batchSize = 50,
     charsDropout = 0.25,
     gradientClipping = GradientClipping.byValue(0.25),

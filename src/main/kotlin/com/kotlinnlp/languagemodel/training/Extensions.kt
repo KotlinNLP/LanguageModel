@@ -16,8 +16,9 @@ import java.io.InputStreamReader
 
 /**
  * @param maxSentences the max number of sentences to read (can be null)
+ * @param reverse whether to train the model reverting the chars sequences (default false)
  */
-fun File.toSequence(maxSentences: Int? = null) = sequence<String> {
+fun File.toSequence(maxSentences: Int? = null, reverse: Boolean = false) = sequence<String> {
 
   var i = 0
 
@@ -28,7 +29,7 @@ fun File.toSequence(maxSentences: Int? = null) = sequence<String> {
       for (line in it) {
         if (maxSentences == null || i < maxSentences) {
           i++
-          yield(line)
+          yield(if (reverse) line.reversed() else line)
         } else {
           break
         }
