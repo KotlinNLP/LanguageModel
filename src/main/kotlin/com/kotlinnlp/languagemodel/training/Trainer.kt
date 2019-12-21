@@ -138,7 +138,7 @@ class Trainer(
       .filter { it.isNotEmpty() }
       .forEachIndexed { i, sentence ->
 
-        this.trainSentence(sentence = if (this.model.reverseModel) sentence.reversed() else sentence)
+        this.trainSentence(sentence)
 
         this.optimizer.update()
 

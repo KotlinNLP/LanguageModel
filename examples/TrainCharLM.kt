@@ -40,7 +40,6 @@ fun main(args: Array<String>) {
   if (reverse) println("Train the reverse model.")
 
   val model = CharLM(
-    reverseModel = reverse,
     charsDict = charsDict,
     inputSize = 25,
     recurrentHiddenSize = 200,

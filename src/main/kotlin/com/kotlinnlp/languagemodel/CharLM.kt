@@ -29,7 +29,6 @@ import java.io.Serializable
  * sequence of characters passed to a recurrent classifier which at each point in the sequence is trained
  * to predict the next character.
  *
- * @property reverseModel where to train the model by seeing the sequence reversed (default false)
  * @param charsDict the dictionary containing the known characters (used both for embeddings and for prediction output)
  * @param inputSize the input size
  * @param recurrentHiddenSize the size of the recurrent hidden layers
@@ -41,7 +40,6 @@ import java.io.Serializable
  * @param biasesInitializer the initializer of the biases (zeros if null, default: null)
  */
 class CharLM(
-  val reverseModel: Boolean = false,
   private val charsDict: DictionarySet<Char>,
   private val inputSize: Int = 20,
   private val recurrentHiddenSize: Int = 100,
@@ -101,12 +99,12 @@ class CharLM(
   val charsEmbeddings = EmbeddingsMap<Char>(size = inputSize)
 
   /**
-   * The Recurrent Network to process the sequence left-to-right, or right-to-left if [reverseModel].
+   * The hidden recurrent network that auto-encodes the sequence of chars.
    */
   val recurrentNetwork: StackedLayersParameters
 
   /**
-   * The Feed-forward Network to predict the next char of the sequence.
+   * The feed-forward network that predicts the next char of the sequence.
    */
   val classifier: StackedLayersParameters
 
