@@ -27,6 +27,7 @@ import com.kotlinnlp.utils.stats.MovingAverage
 import java.io.File
 import java.io.FileOutputStream
 import kotlin.math.exp
+import kotlin.math.min
 
 /**
  * Class responsible for the performance of training process in epochs.
@@ -200,7 +201,7 @@ class Trainer(
 
     while (start < sentence.length) {
 
-      val end: Int = Math.min(start + this.batchSize, sentence.length)
+      val end: Int = min(start + this.batchSize, sentence.length)
       val nextChar: Char? = if (end < sentence.length) sentence[end] else null
 
       this.newBatch()
@@ -230,13 +231,13 @@ class Trainer(
 
     // The target is always the next character.
     val lastCharId: Int = nextChar?.let { this.model.getCharId(nextChar)} ?: this.model.etxCharId
-    val targets: List<DenseNDArray> = (0 until batch.length).map { i ->
+    val targets: List<DenseNDArray> = batch.indices.map { i ->
       DenseNDArrayFactory.oneHotEncoder(
         length = this.model.classifier.outputSize,
         oneAt = if (i == batch.lastIndex) lastCharId else this.model.getCharId(batch[i + 1]))
     }
 
-    val errors: List<DenseNDArray> = SoftmaxCrossEntropyCalculator().calculateErrors(
+    val errors: List<DenseNDArray> = SoftmaxCrossEntropyCalculator.calculateErrors(
       outputSequence = predictions,
       outputGoldSequence = targets)
 
