@@ -45,7 +45,7 @@ fun main(args: Array<String>) {
     recurrentHiddenSize = 200,
     recurrentHiddenDropout = 0.0,
     recurrentConnectionType = LayerType.Connection.LSTM,
-    recurrentHiddenActivation = Tanh(),
+    recurrentHiddenActivation = Tanh,
     recurrentLayers = 1)
 
   val trainer = Trainer(
