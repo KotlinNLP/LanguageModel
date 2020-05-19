@@ -16,6 +16,7 @@ import com.kotlinnlp.simplednn.core.functionalities.gradientclipping.GradientCli
 import com.kotlinnlp.simplednn.core.functionalities.updatemethods.adam.ADAMMethod
 import com.kotlinnlp.simplednn.core.layers.LayerType
 import com.kotlinnlp.utils.DictionarySet
+import com.xenomachina.argparser.mainBody
 import java.io.File
 
 /**
@@ -23,7 +24,7 @@ import java.io.File
  *
  * Launch with the '-h' option for help about the command line arguments.
  */
-fun main(args: Array<String>) {
+fun main(args: Array<String>) = mainBody {
 
   val parsedArgs = CommandLineArguments(args)
 
