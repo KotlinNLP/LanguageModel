@@ -43,8 +43,8 @@ internal class CommandLineArguments(args: Array<String>) {
    * whether to train in reverse mode.
    */
   val reverse: Boolean by parser.flagging(
-    "-t",
-    "--training-set-path",
+    "-r",
+    "--reverse",
     help="whether to train in reverse mode"
   )
 
