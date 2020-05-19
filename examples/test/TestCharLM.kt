@@ -5,20 +5,27 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  * ------------------------------------------------------------------*/
 
+package test
+
 import com.kotlinnlp.languagemodel.CharLM
 import java.io.File
 import java.io.FileInputStream
 
 /**
- * Test the CharLM.
+ * Test a [CharLM] model.
  *
- * The first argument is the model file name.
- * The second argument is the max length of an output sequence (default 100).
+ * Launch with the '-h' option for help about the command line arguments.
  */
 fun main(args: Array<String>) {
 
-  val model = CharLM.load(FileInputStream(File(args[0])))
-  val maxSentenceLength: Int = if (args.size > 1) args[1].toInt() else 100
+  val parsedArgs = CommandLineArguments(args)
+
+  val model: CharLM = parsedArgs.modelPath.let {
+    println("Loading CharLM model from '$it'...")
+    CharLM.load(FileInputStream(File(it)))
+  }
+
+  println("Max sentence length = ${parsedArgs.maxOutputLength}")
 
   val decoder = RandomWeightedChoiceDecoder(model)
 
@@ -29,7 +36,7 @@ fun main(args: Array<String>) {
     if (inputText.isEmpty())
       break
     else
-      println(decoder.decode(input = inputText, maxSentenceLength = maxSentenceLength))
+      println(decoder.decode(input = inputText, maxSentenceLength = parsedArgs.maxOutputLength))
   }
 
   println("\nExiting...")

@@ -5,6 +5,8 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  * ------------------------------------------------------------------*/
 
+package training
+
 import com.kotlinnlp.languagemodel.CharLM
 import com.kotlinnlp.languagemodel.training.Trainer
 import com.kotlinnlp.languagemodel.training.collectChars
@@ -17,17 +19,15 @@ import com.kotlinnlp.utils.DictionarySet
 import java.io.File
 
 /**
- * Train the CharLM.
+ * Train and validate a [CharLM] model.
  *
- * The first argument is the corpus file path.
- * The second argument is the filename in which to save the model.
- * The presence of a third parameter indicates whether to train in reverse mode.
+ * Launch with the '-h' option for help about the command line arguments.
  */
 fun main(args: Array<String>) {
 
-  val corpus = File(args[0])
-  val modelFileName = args[1]
-  val reverse: Boolean = args.size > 2
+  val parsedArgs = CommandLineArguments(args)
+
+  val corpus = File(parsedArgs.trainingSetPath)
   val charsDict = DictionarySet<Char>()
 
   corpus.toSequence(maxSentences = 100000).collectChars(charsDict)
@@ -37,7 +37,7 @@ fun main(args: Array<String>) {
   println("Dictionary size: ${charsDict.size}")
   println("Number of training sentences: ${corpus.toSequence().count()}")
 
-  if (reverse) println("Train the reverse model.")
+  if (parsedArgs.reverse) println("Train the reverse model.")
 
   val model = CharLM(
     charsDict = charsDict,
@@ -50,8 +50,8 @@ fun main(args: Array<String>) {
 
   val trainer = Trainer(
     model = model,
-    modelFilename = modelFileName,
-    sentences = corpus.toSequence(reverse = reverse),
+    modelFilename = parsedArgs.modelPath,
+    sentences = corpus.toSequence(reverse = parsedArgs.reverse),
     batchSize = 50,
     charsDropout = 0.25,
     gradientClipping = GradientClipping.byValue(0.25),

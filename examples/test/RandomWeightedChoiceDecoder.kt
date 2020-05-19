@@ -5,6 +5,8 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  * ------------------------------------------------------------------*/
 
+package test
+
 import com.kotlinnlp.languagemodel.CharLM
 import com.kotlinnlp.simplednn.core.neuralprocessor.feedforward.FeedforwardNeuralProcessor
 import com.kotlinnlp.simplednn.core.neuralprocessor.recurrent.RecurrentNeuralProcessor
@@ -16,7 +18,7 @@ import com.kotlinnlp.simplednn.simplemath.ndarray.dense.DenseNDArray
  *
  * @param model a char language model
  */
-class RandomWeightedChoiceDecoder(private val model: CharLM) {
+internal class RandomWeightedChoiceDecoder(private val model: CharLM) {
 
   /**
    * The recurrent processor used to process a character at time.
