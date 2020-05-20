@@ -13,7 +13,7 @@ import com.kotlinnlp.languagemodel.training.collectChars
 import com.kotlinnlp.languagemodel.training.toSequence
 import com.kotlinnlp.simplednn.core.functionalities.activations.Tanh
 import com.kotlinnlp.simplednn.core.functionalities.gradientclipping.GradientClipping
-import com.kotlinnlp.simplednn.core.functionalities.updatemethods.adam.ADAMMethod
+import com.kotlinnlp.simplednn.core.functionalities.updatemethods.radam.RADAMMethod
 import com.kotlinnlp.simplednn.core.layers.LayerType
 import com.kotlinnlp.utils.DictionarySet
 import com.xenomachina.argparser.mainBody
@@ -57,7 +57,7 @@ fun main(args: Array<String>) = mainBody {
     charsDropout = 0.25,
     gradientClipping = GradientClipping.byValue(0.25),
     epochs = 1,
-    updateMethod = ADAMMethod(stepSize = 0.001, beta1 = 0.9, beta2 = 0.999),
+    updateMethod = RADAMMethod(stepSize = 0.001, beta1 = 0.9, beta2 = 0.999),
     verbose = true)
 
   trainer.train()
