@@ -179,7 +179,7 @@ class Trainer(
 
       this.bestLossMean = lossMean
 
-      println("[NEW BEST PERPLEXITY!] Saving model...")
+      println("[NEW BEST PERPLEXITY!] Saving the model to '$modelFilename'...")
 
       this.model.avgPerplexity = exp(this.bestLossMean!!)
       this.model.dump(FileOutputStream(File(this.modelFilename)))
