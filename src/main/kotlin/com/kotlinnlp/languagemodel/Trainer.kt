@@ -5,9 +5,8 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  * ------------------------------------------------------------------*/
 
-package com.kotlinnlp.languagemodel.training
+package com.kotlinnlp.languagemodel
 
-import com.kotlinnlp.languagemodel.CharLM
 import com.kotlinnlp.simplednn.core.functionalities.gradientclipping.GradientClipping
 import com.kotlinnlp.simplednn.core.functionalities.losses.SoftmaxCrossEntropyCalculator
 import com.kotlinnlp.simplednn.core.functionalities.updatemethods.UpdateMethod

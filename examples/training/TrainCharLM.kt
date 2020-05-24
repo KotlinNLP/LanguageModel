@@ -8,7 +8,7 @@
 package training
 
 import com.kotlinnlp.languagemodel.CharLM
-import com.kotlinnlp.languagemodel.training.Trainer
+import com.kotlinnlp.languagemodel.Trainer
 import com.kotlinnlp.simplednn.core.functionalities.activations.Tanh
 import com.kotlinnlp.simplednn.core.functionalities.gradientclipping.GradientClipping
 import com.kotlinnlp.simplednn.core.functionalities.updatemethods.radam.RADAMMethod
