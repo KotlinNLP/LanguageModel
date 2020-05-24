@@ -67,7 +67,7 @@ class CharLM(
     /**
      * The char used to identify the end of text.
      */
-    const val ETX = 3.toChar()
+    const val ETX: Char = 3.toChar()
 
     /**
      * Add to the [dict] the special chars used to identify the unknown and the end of the sentence.
