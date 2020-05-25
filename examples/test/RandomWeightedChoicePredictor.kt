@@ -29,7 +29,7 @@ internal class RandomWeightedChoicePredictor(private val model: CharLM) {
   /**
    * The classifier that predicts the next character of the sequence.
    */
-  private val classifierProcessor: FeedforwardNeuralProcessor<DenseNDArray> =
+  private val outputClassifier: FeedforwardNeuralProcessor<DenseNDArray> =
     FeedforwardNeuralProcessor(model = this.model.outputClassifier, useDropout = false, propagateToInput = false)
 
   /**
@@ -66,7 +66,7 @@ internal class RandomWeightedChoicePredictor(private val model: CharLM) {
 
     val charsEmbeddings: List<DenseNDArray> = input.map { this.model.charsEmbeddings[it].values }
     val charsEncodings: List<DenseNDArray> = this.hiddenProcessor.forward(charsEmbeddings)
-    val prediction: DenseNDArray = this.classifierProcessor.forward(charsEncodings.last())
+    val prediction: DenseNDArray = this.outputClassifier.forward(charsEncodings.last())
 
     return this.model.getChar(prediction.argMaxIndex())
   }
@@ -81,8 +81,8 @@ internal class RandomWeightedChoicePredictor(private val model: CharLM) {
   private fun predictNextChar(lastChar: Char): Char {
 
     val lastCharEmbedding: DenseNDArray = this.model.charsEmbeddings[lastChar].values
-    val prediction: DenseNDArray = this.classifierProcessor.forward(
-      this.hiddenProcessor.forward(lastCharEmbedding, firstState = false))
+    val lastCharsEncoding: DenseNDArray = this.hiddenProcessor.forward(lastCharEmbedding, firstState = false)
+    val prediction: DenseNDArray = this.outputClassifier.forward(lastCharsEncoding)
 
     var prob: Double = Math.random()
     val charIndex: Int = prediction.toDoubleArray().indexOfFirst { x ->
