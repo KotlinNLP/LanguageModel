@@ -10,6 +10,7 @@ import com.kotlinnlp.simplednn.core.neuralprocessor.ChainProcessor
 import com.kotlinnlp.simplednn.core.neuralprocessor.batchfeedforward.BatchFeedforwardProcessor
 import com.kotlinnlp.simplednn.core.neuralprocessor.embeddingsprocessor.EmbeddingsProcessor
 import com.kotlinnlp.simplednn.core.neuralprocessor.recurrent.RecurrentNeuralProcessor
+import com.kotlinnlp.simplednn.simplemath.ndarray.dense.DenseNDArray
 import com.kotlinnlp.simplednn.simplemath.ndarray.dense.DenseNDArrayFactory
 import com.kotlinnlp.simplednn.simplemath.safeLog
 import java.io.File
@@ -18,9 +19,9 @@ import kotlin.math.exp
 
 /**
  * Get the perplexity of a sentence using the language model.
- * The perplexity is calculated with 'exp(loss)'.
+ * The perplexity is calculated as `exp(loss)`.
  *
- * The first argument is the model file name.
+ * One argument is required: the model filename.
  */
 fun main(args: Array<String>) {
 
@@ -29,26 +30,21 @@ fun main(args: Array<String>) {
 
   while (true) {
 
-    val inputText = readValue().let { if (it.length == 1) " $it " else it}
+    val inputText: String = (readValue() ?: break).let { if (it.length == 1) " $it " else it }
+    val chars: List<Char> = inputText.asSequence().take(inputText.length - 1).toList()
+    val predictions: List<DenseNDArray> = processor.forward(chars)
 
-    if (inputText.isEmpty()) {
-
-      break
-
-    } else {
-
-      val prediction = processor.forward(inputText.take(inputText.length - 1).toList())
-
-      // The target is always the next character.
-      val targets = (0 until inputText.length - 1)
-        .map { i -> model.getCharId(inputText[i + 1]) }
-        .map { charId -> DenseNDArrayFactory.oneHotEncoder(length = model.classifier.outputSize, oneAt = charId) }
-
-      val loss = prediction.zip(targets).map { (y, g) -> -safeLog(y[g.argMaxIndex()]) }.average()
-      val perplexity = exp(loss)
-
-      println("Perplexity: $perplexity")
+    // The target is always the next character.
+    val targets: List<DenseNDArray> = (1 until inputText.length).map { i ->
+      DenseNDArrayFactory.oneHotEncoder(
+        length = model.outputClassifier.outputSize,
+        oneAt = model.getCharId(inputText[i]))
     }
+
+    val loss: Double = predictions.zip(targets).map { (y, g) -> -safeLog(y[g.argMaxIndex()]) }.average()
+    val perplexity: Double = exp(loss)
+
+    println("Perplexity: $perplexity")
   }
 
   println("\nExiting...")
@@ -57,21 +53,27 @@ fun main(args: Array<String>) {
 /**
  * Read a value from the standard input.
  *
- * @return the string read
+ * @return the string read or `null` if the input was blank
  */
-private fun readValue(): String {
+private fun readValue(): String? {
 
   print("\nType the beginning of the sequence. Even a single character (empty to exit): ")
 
-  return readLine()!!
+  return readLine()!!.ifBlank { null }
 }
 
 /**
- * @return the processor to use the CharLM model
+ * @param model a char language model
+ *
+ * @return a next char classifier based on the given language model
  */
 private fun buildProcessor(model: CharLM) = ChainProcessor(
-  inputProcessor = EmbeddingsProcessor(embeddingsMap = model.charsEmbeddings),
-  hiddenProcessors = listOf(
-    RecurrentNeuralProcessor(model = model.recurrentNetwork, useDropout = false, propagateToInput = false)),
-  outputProcessor = BatchFeedforwardProcessor(model = model.classifier, useDropout = false, propagateToInput = false))
-
+  inputProcessor = EmbeddingsProcessor(model.charsEmbeddings),
+  hiddenProcessors = listOf(RecurrentNeuralProcessor(
+    model = model.hiddenNetwork,
+    useDropout = false,
+    propagateToInput = false)),
+  outputProcessor = BatchFeedforwardProcessor(
+    model = model.outputClassifier,
+    useDropout = false,
+    propagateToInput = false))

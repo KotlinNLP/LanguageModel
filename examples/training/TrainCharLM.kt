@@ -9,10 +9,8 @@ package training
 
 import com.kotlinnlp.languagemodel.CharLM
 import com.kotlinnlp.languagemodel.Trainer
-import com.kotlinnlp.simplednn.core.functionalities.activations.Tanh
 import com.kotlinnlp.simplednn.core.functionalities.gradientclipping.GradientClipping
 import com.kotlinnlp.simplednn.core.functionalities.updatemethods.radam.RADAMMethod
-import com.kotlinnlp.simplednn.core.layers.LayerType
 import com.kotlinnlp.utils.DictionarySet
 import com.xenomachina.argparser.mainBody
 import java.io.File
@@ -27,30 +25,19 @@ fun main(args: Array<String>) = mainBody {
   val parsedArgs = CommandLineArguments(args)
 
   val corpusFile = File(parsedArgs.trainingSetPath)
-  val charsDict = DictionarySet<Char>()
-
-  collectChars(strings = getLinesSequence(file = corpusFile, maxLength = 100000), dictionary = charsDict)
-
-  CharLM.addSpecialChars(charsDict)
+  val charsDict = DictionarySet<Char>().apply {
+    getLinesSequence(file = corpusFile, maxLength = 100000).forEach { it.forEach { char -> add(char) } }
+  }
 
   println("Dictionary size: ${charsDict.size}")
   println("Number of training sentences: ${getLinesSequence(corpusFile).count()}")
 
   if (parsedArgs.reverse) println("Train the reverse model.")
 
-  val model = CharLM(
-    charsDict = charsDict,
-    inputSize = 25,
-    recurrentHiddenSize = 200,
-    recurrentHiddenDropout = 0.0,
-    recurrentConnectionType = LayerType.Connection.LSTM,
-    recurrentHiddenActivation = Tanh,
-    recurrentLayers = 1)
-
   println("\n-- START TRAINING")
 
   Trainer(
-    model = model,
+    model = CharLM(charsDict),
     modelFilename = parsedArgs.modelPath,
     sentences = getLinesSequence(file = corpusFile, reverseChars = parsedArgs.reverse).asIterable(),
     charsBatchesSize = 50,
@@ -76,22 +63,5 @@ private fun getLinesSequence(file: File, maxLength: Int? = null, reverseChars: B
       else
         return@useLines
     }
-  }
-}
-
-/**
- * Collect the chars from a sequence of strings to a given dictionary.
- *
- * @param strings a sequence of strings
- * @param dictionary a dictionary set of chars
- */
-private fun collectChars(strings: Sequence<String>, dictionary: DictionarySet<Char>) {
-
-  strings.forEach { str ->
-
-    if (str.contains(CharLM.ETX) || str.contains(CharLM.UNK))
-      throw RuntimeException("The line can't contain the NULL or the ETX chars")
-
-    str.forEach { dictionary.add(it) }
   }
 }

@@ -62,36 +62,46 @@ class Trainer(
    * @param nextChar the char that follows the batch or `null` if this batch is the last of the sentence
    * @param isSentenceStart `true` if this is the first batch of a sentence, otherwise `false`
    */
-  data class CharsBatch(val text: String, val nextChar: Char?, val isSentenceStart: Boolean)
+  private inner class CharsBatch(val text: String, val nextChar: Char?, val isSentenceStart: Boolean) {
+
+    /**
+     * @return the classification targets for this batch (the next chars classifications)
+     */
+    fun getClassificationTargets(): List<DenseNDArray> {
+
+      val model: CharLM = this@Trainer.model
+      val lastCharId: Int = this.nextChar?.let { model.getCharId(this.nextChar)} ?: model.etxCharId
+
+      return this.text.indices
+        .asSequence()
+        .map { i -> if (i == this.text.lastIndex) lastCharId else model.getCharId(this.text[i + 1]) }
+        .map { charId -> DenseNDArrayFactory.oneHotEncoder(length = model.outputClassifier.outputSize, oneAt = charId) }
+        .toList()
+    }
+  }
 
   /**
-   * The processor of the input network.
+   * The input embeddings processor.
    */
-  private val inputProcessor: EmbeddingsProcessor<Char> = EmbeddingsProcessor(
-    embeddingsMap = this.model.charsEmbeddings,
-    dropout = this.charsDropout)
+  private val embProcessor: EmbeddingsProcessor<Char> =
+    EmbeddingsProcessor(embeddingsMap = this.model.charsEmbeddings, dropout = this.charsDropout)
 
   /**
-   * The processors of the hidden networks.
+   * The hidden processor to auto-encode the input.
    */
-  private val hiddenProcessors: List<RecurrentNeuralProcessor<DenseNDArray>> = listOf(
-    RecurrentNeuralProcessor(
-      model = this.model.recurrentNetwork,
-      useDropout = true,
-      propagateToInput = true))
+  private val hiddenProcessor: RecurrentNeuralProcessor<DenseNDArray> =
+    RecurrentNeuralProcessor(model = this.model.hiddenNetwork, useDropout = true, propagateToInput = true)
 
   /**
-   * The processor of the output network.
+   * The output classifier.
    */
-  private val outputProcessor: BatchFeedforwardProcessor<DenseNDArray> = BatchFeedforwardProcessor(
-    model = this.model.classifier,
-    useDropout = true,
-    propagateToInput = true)
+  private val outputClassifier: BatchFeedforwardProcessor<DenseNDArray> =
+    BatchFeedforwardProcessor(model = this.model.outputClassifier, useDropout = true, propagateToInput = true)
 
   /**
    * Support to save the initial hidden arrays during the batch learning.
    */
-  private lateinit var initHiddens: List<List<DenseNDArray>>
+  private lateinit var initHiddens: List<DenseNDArray>
 
   /**
    * The loss accumulated during the training.
@@ -151,33 +161,51 @@ class Trainer(
    * @param batch a chars batch
    */
   private fun learnFromBatch(batch: CharsBatch) {
+    this.backward(predictions = this.forward(batch), targets = batch.getClassificationTargets())
+  }
 
-    val predictions: List<DenseNDArray> = this.outputProcessor.forward(
-      this.hiddenProcessors.forward(
-        input = this.inputProcessor.forward(batch.text.toList()),
-        initHiddens = if (batch.isSentenceStart) null else this.initHiddens))
+  /**
+   * Forward a batch returning the next chars predictions.
+   *
+   * @param batch a training batch
+   *
+   * @return the next chars predictions
+   */
+  private fun forward(batch: CharsBatch): List<DenseNDArray> {
 
-    this.initHiddens = this.hiddenProcessors.map { it.getCurState(copy = true)!! }
+    val charsEmbeddings: List<DenseNDArray> = this.embProcessor.forward(batch.text.toList())
 
-    // The target is always the next character.
-    val lastCharId: Int = batch.nextChar?.let { this.model.getCharId(batch.nextChar)} ?: this.model.etxCharId
-    val targets: List<DenseNDArray> = batch.text.indices.map { i ->
-      DenseNDArrayFactory.oneHotEncoder(
-        length = this.model.classifier.outputSize,
-        oneAt = if (i == batch.text.lastIndex) lastCharId else this.model.getCharId(batch.text[i + 1]))
+    val charsEncodings: List<DenseNDArray> = this.hiddenProcessor.let {
+      it.forward(input = charsEmbeddings, initHiddenArrays = if (batch.isSentenceStart) null else this.initHiddens)
+      this.initHiddens = it.getCurState(copy = true)!!
+      it.getOutputSequence(copy = false)
     }
 
-    val errors: List<DenseNDArray> =
+    return this.outputClassifier.forward(charsEncodings)
+  }
+
+  /**
+   * Execute the backward of the processors and accumulate the loss.
+   *
+   * @param predictions the next chars predictions of the last batch
+   * @param targets the given predictions targets
+   */
+  private fun backward(predictions: List<DenseNDArray>, targets: List<DenseNDArray>) {
+
+    val outputErrors: List<DenseNDArray> =
       SoftmaxCrossEntropyCalculator.calculateErrors(outputSequence = predictions, outputGoldSequence = targets)
 
-    this.inputProcessor.backward(
-      this.hiddenProcessors.backwardAndGetInputErrors(
-        this.outputProcessor.let {
-          it.backward(errors)
-          it.getInputErrors(copy = false)
-        }
-      )
-    )
+    val hiddenErrors: List<DenseNDArray> = this.outputClassifier.let {
+      it.backward(outputErrors)
+      it.getInputErrors(copy = false)
+    }
+
+    val embeddingsErrors: List<DenseNDArray> = this.hiddenProcessor.let {
+      it.backward(hiddenErrors)
+      it.getInputErrors(copy = false)
+    }
+
+    this.embProcessor.backward(embeddingsErrors)
 
     predictions.zip(targets).forEach { (prediction, target) ->
       this.avgLoss.add(-safeLog(prediction[target.argMaxIndex()]))
@@ -185,13 +213,13 @@ class Trainer(
   }
 
   /**
-   * Accumulate the errors of the model resulting after the call of [learnFromBatch].
+   * Accumulate the errors of the model resulting after the [learnFromBatch].
    */
   private fun accumulateBatchErrors() {
 
-    val paramsErrors: ParamsErrorsList = this.inputProcessor.getParamsErrors(copy = false) +
-      this.hiddenProcessors.flatMap { it.getParamsErrors(copy = false) } +
-      this.outputProcessor.getParamsErrors(copy = false)
+    val paramsErrors: ParamsErrorsList = this.embProcessor.getParamsErrors(copy = false) +
+      this.hiddenProcessor.getParamsErrors(copy = false) +
+      this.outputClassifier.getParamsErrors(copy = false)
 
     this.optimizers.first().accumulate(paramsErrors)
   }
@@ -240,8 +268,8 @@ class Trainer(
 
     if (str.isNotBlank()) {
 
-      if (str.contains(CharLM.ETX) || str.contains(CharLM.UNK))
-        throw RuntimeException("The training sentence cannot contain the NULL or ETX chars")
+      if (str.contains(CharLM.UNK) || str.contains(CharLM.ETX))
+        throw RuntimeException("The training sentence cannot contain the UNK or ETX chars")
 
       var start = 0
 
@@ -255,53 +283,5 @@ class Trainer(
         start = end
       }
     }
-  }
-
-
-  /**
-   * Execute the forward of the hidden processors.
-   *
-   * @param input the input
-   * @param initHiddens the initial hidden arrays
-   *
-   * @return the output arrays
-   */
-  private fun List<RecurrentNeuralProcessor<DenseNDArray>>.forward(
-    input: List<DenseNDArray>,
-    initHiddens: List<List<DenseNDArray>?>?
-  ): List<DenseNDArray> {
-
-    var curInput = input
-
-    this.forEachIndexed { i, processor ->
-      processor.forward(input = curInput, initHiddenArrays = initHiddens?.get(i))
-      curInput = processor.getOutputSequence(copy = false)
-    }
-
-    return curInput.map { it.copy() }
-  }
-
-  /**
-   * Perform the backward of the hidden processors returning the input errors.
-   *
-   * @param outputErrors the output errors
-   *
-   * @return the input errors of the first hidden processor
-   */
-  private fun List<RecurrentNeuralProcessor<DenseNDArray>>.backwardAndGetInputErrors(
-    outputErrors: List<DenseNDArray>
-  ): List<DenseNDArray> {
-
-    var errors = outputErrors
-
-    this.asReversed().forEach { proc ->
-
-      errors = proc.let {
-        it.backward(errors)
-        it.getInputErrors(copy = false)
-      }
-    }
-
-    return errors
   }
 }

@@ -28,16 +28,10 @@ fun main(args: Array<String>) = mainBody {
 
   println("Max sentence length = ${parsedArgs.maxOutputLength}")
 
-  val decoder = RandomWeightedChoiceDecoder(model)
+  val predictor = RandomWeightedChoicePredictor(model)
 
   while (true) {
-
-    val inputText = readValue()
-
-    if (inputText.isEmpty())
-      break
-    else
-      println(decoder.decode(input = inputText, maxSentenceLength = parsedArgs.maxOutputLength))
+    println(predictor.predict(input = readValue() ?: break, maxSentenceLength = parsedArgs.maxOutputLength))
   }
 
   println("\nExiting...")
@@ -46,11 +40,11 @@ fun main(args: Array<String>) = mainBody {
 /**
  * Read a value from the standard input.
  *
- * @return the string read
+ * @return the string read or `null` if the input was blank
  */
-private fun readValue(): String {
+private fun readValue(): String? {
 
   print("\nType the beginning of the sequence. Even a single character (empty to exit): ")
 
-  return readLine()!!
+  return readLine()!!.ifBlank { null }
 }

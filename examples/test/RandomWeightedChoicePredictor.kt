@@ -18,34 +18,32 @@ import com.kotlinnlp.simplednn.simplemath.ndarray.dense.DenseNDArray
  *
  * @param model a char language model
  */
-internal class RandomWeightedChoiceDecoder(private val model: CharLM) {
+internal class RandomWeightedChoicePredictor(private val model: CharLM) {
 
   /**
-   * The recurrent processor used to process a character at time.
+   * The recurrent hidden processor that encodes a character at time.
    */
-  private val recurrentProcessor = RecurrentNeuralProcessor<DenseNDArray>(
-    model = model.recurrentNetwork,
-    useDropout = false,
-    propagateToInput = false)
+  private val hiddenProcessor: RecurrentNeuralProcessor<DenseNDArray> =
+    RecurrentNeuralProcessor(model = this.model.hiddenNetwork, useDropout = false, propagateToInput = false)
 
   /**
-   * The classifier that predict the next character of the sequence.
+   * The classifier that predicts the next character of the sequence.
    */
-  private val classifierProcessor = FeedforwardNeuralProcessor<DenseNDArray>(
-    model = model.classifier,
-    useDropout = false,
-    propagateToInput = false)
+  private val classifierProcessor: FeedforwardNeuralProcessor<DenseNDArray> =
+    FeedforwardNeuralProcessor(model = this.model.outputClassifier, useDropout = false, propagateToInput = false)
 
   /**
-   * @param input the first characters of the sequence
-   * @param maxSentenceLength the max number of character of the output sequence
+   * Predict the continuation of a characters sequence, based on the given language model.
+   *
+   * @param input the input chars sequence
+   * @param maxSentenceLength the max number of characters of the output sequence
    *
    * @return the predicted sequence
    */
-  fun decode(input: String, maxSentenceLength: Int): String {
+  fun predict(input: String, maxSentenceLength: Int): String {
 
     val sentence = StringBuffer(input)
-    var nextChar: Char = this.initSequence(input)
+    var nextChar: Char = this.initPrediction(input)
 
     while (sentence.length < maxSentenceLength && !this.model.isEndOfSentence(nextChar)) {
 
@@ -58,22 +56,24 @@ internal class RandomWeightedChoiceDecoder(private val model: CharLM) {
   }
 
   /**
-   * Process the [input] with the recurrent processor.
+   * Initialize the prediction processing the whole input sequence and returning the next char predicted.
    *
-   * @param input the first characters of the sequence
+   * @param input the input chars sequence
    *
    * @return the next char predicted
    */
-  private fun initSequence(input: String): Char {
+  private fun initPrediction(input: String): Char {
 
     val charsEmbeddings: List<DenseNDArray> = input.map { this.model.charsEmbeddings[it].values }
-    val prediction: DenseNDArray = this.classifierProcessor.forward(
-      this.recurrentProcessor.forward(charsEmbeddings).last())
+    val charsEncodings: List<DenseNDArray> = this.hiddenProcessor.forward(charsEmbeddings)
+    val prediction: DenseNDArray = this.classifierProcessor.forward(charsEncodings.last())
 
     return this.model.getChar(prediction.argMaxIndex())
   }
 
   /**
+   * Predict the next char of the current sequence.
+   *
    * @param lastChar the last char predicted
    *
    * @return the next char predicted
@@ -82,7 +82,7 @@ internal class RandomWeightedChoiceDecoder(private val model: CharLM) {
 
     val lastCharEmbedding: DenseNDArray = this.model.charsEmbeddings[lastChar].values
     val prediction: DenseNDArray = this.classifierProcessor.forward(
-      this.recurrentProcessor.forward(lastCharEmbedding, firstState = false))
+      this.hiddenProcessor.forward(lastCharEmbedding, firstState = false))
 
     var prob: Double = Math.random()
     val charIndex: Int = prediction.toDoubleArray().indexOfFirst { x ->

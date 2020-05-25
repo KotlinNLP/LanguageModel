@@ -10,6 +10,7 @@ package com.kotlinnlp.languagemodel
 import com.kotlinnlp.simplednn.core.embeddings.EmbeddingsMap
 import com.kotlinnlp.simplednn.core.functionalities.activations.ActivationFunction
 import com.kotlinnlp.simplednn.core.functionalities.activations.Softmax
+import com.kotlinnlp.simplednn.core.functionalities.activations.Tanh
 import com.kotlinnlp.simplednn.core.functionalities.initializers.GlorotInitializer
 import com.kotlinnlp.simplednn.core.functionalities.initializers.Initializer
 import com.kotlinnlp.simplednn.core.layers.LayerInterface
@@ -23,30 +24,30 @@ import java.io.OutputStream
 import java.io.Serializable
 
 /**
- * The serializable model of the character language-model.
+ * The model of the character language-model.
  *
- * This implementation uses the characters as atomic units of language modeling, allowing text to be treated as a
- * sequence of characters passed to a recurrent classifier which at each point in the sequence is trained
- * to predict the next character.
+ * This implementation uses the characters as atomic units of language modelling.
+ * The texts are treated as a sequence of characters passed to a recurrent classifier which at each point in the
+ * sequence is trained to predict the next character.
  *
  * @param charsDict the dictionary containing the known characters (used both for embeddings and for prediction output)
- * @param inputSize the input size
- * @param recurrentHiddenSize the size of the recurrent hidden layers
+ * @param charsEmbeddingsSize the size of the chars embeddings (default 25)
+ * @param recurrentHiddenSize the size of the recurrent hidden layers (default 200)
  * @param recurrentHiddenDropout the dropout of the recurrent hidden layers (used during training only, default 0.0)
- * @param recurrentConnectionType the recurrent connection type (e.g. LSTM, GRU, RAN)
- * @param recurrentHiddenActivation the activation function of the recurrent layers (can be null)
- * @param recurrentLayers the number of recurrent layers (min 1)
+ * @param recurrentConnection the recurrent connection type (e.g. LSTM -default-, GRU, RAN, etc...)
+ * @param recurrentHiddenActivation the activation function of the recurrent layers (default [Tanh])
+ * @param numOfRecurrentLayers the number of recurrent layers (default 1)
  * @param weightsInitializer the initializer of the weights (zeros if null, default: Glorot)
  * @param biasesInitializer the initializer of the biases (zeros if null, default: null)
  */
 class CharLM(
   private val charsDict: DictionarySet<Char>,
-  private val inputSize: Int = 20,
-  private val recurrentHiddenSize: Int = 100,
-  private val recurrentHiddenDropout: Double = 0.0,
-  private val recurrentConnectionType: LayerType.Connection,
-  private val recurrentHiddenActivation: ActivationFunction?,
-  private val recurrentLayers: Int,
+  charsEmbeddingsSize: Int = 25,
+  recurrentHiddenSize: Int = 200,
+  recurrentHiddenDropout: Double = 0.0,
+  recurrentConnection: LayerType.Connection = LayerType.Connection.LSTM,
+  recurrentHiddenActivation: ActivationFunction? = Tanh,
+  numOfRecurrentLayers: Int = 1,
   weightsInitializer: Initializer? = GlorotInitializer(),
   biasesInitializer: Initializer? = null
 ) : Serializable {
@@ -60,28 +61,14 @@ class CharLM(
     private const val serialVersionUID: Long = 1L
 
     /**
-     * The char used for unknown chars.
+     * The special char used to identify unknown chars.
      */
-    const val UNK: Char = 0.toChar()
+    internal const val UNK: Char = 0.toChar()
 
     /**
-     * The char used to identify the end of text.
+     * The special char used to identify the end of text.
      */
-    const val ETX: Char = 3.toChar()
-
-    /**
-     * Add to the [dict] the special chars used to identify the unknown and the end of the sentence.
-     *
-     * @param dict the chars dictionary set
-     */
-    fun addSpecialChars(dict: DictionarySet<Char>) {
-
-      require(!dict.contains(UNK))
-      require(!dict.contains(ETX))
-
-      dict.add(UNK)
-      dict.add(ETX)
-    }
+    internal const val ETX: Char = 3.toChar()
 
     /**
      * Read a [CharLM] (serialized) from an input stream and decode it.
@@ -96,22 +83,40 @@ class CharLM(
   /**
    * The chars embeddings.
    */
-  val charsEmbeddings = EmbeddingsMap<Char>(size = inputSize)
+  val charsEmbeddings = EmbeddingsMap<Char>(charsEmbeddingsSize)
 
   /**
-   * The hidden recurrent network that auto-encodes the sequence of chars.
+   * The hidden recurrent network that encodes the sequence of chars.
    */
-  val recurrentNetwork: StackedLayersParameters
+  val hiddenNetwork: StackedLayersParameters = StackedLayersParameters(
+    layersConfiguration = listOf(
+      LayerInterface(size = charsEmbeddingsSize, type = LayerType.Input.Dense)
+    ) + (0 until numOfRecurrentLayers).map {
+      LayerInterface(
+        size = recurrentHiddenSize,
+        activationFunction = recurrentHiddenActivation,
+        connectionType = recurrentConnection,
+        dropout = recurrentHiddenDropout
+      )},
+    weightsInitializer = weightsInitializer,
+    biasesInitializer = biasesInitializer
+  ).apply {
+    (paramsPerLayer.last() as? LSTMLayerParameters)?.initForgetGateBiasToOne()
+  }
 
   /**
    * The feed-forward network that predicts the next char of the sequence.
    */
-  val classifier: StackedLayersParameters
-
-  /**
-   * The output size of the classifier.
-   */
-  val classifierOutputSize: Int = this.charsDict.size
+  val outputClassifier: StackedLayersParameters = StackedLayersParameters(
+    LayerInterface(
+      size = this.hiddenNetwork.outputSize,
+      type = LayerType.Input.Dense),
+    LayerInterface(
+      size = this.charsDict.size + 2, // 2 special chars
+      activationFunction = Softmax(),
+      connectionType = LayerType.Connection.Feedforward),
+    weightsInitializer = weightsInitializer,
+    biasesInitializer = biasesInitializer)
 
   /**
    * The average perplexity of the model, calculated during the training.
@@ -129,57 +134,37 @@ class CharLM(
    */
   val etxCharId: Int by lazy { this.charsDict.getId(ETX)!! }
 
+  /**
+   * Check requirements.
+   * Complete the dictionary and the chars embeddings map with the special chars.
+   */
   init {
 
-    require(recurrentLayers >= 0) { "The number of recurrent layers must be >= 0." }
-    require(recurrentConnectionType.property == LayerType.Property.Recurrent) { "The connection type must be recurrent." }
-
-    val layersConfiguration = mutableListOf<LayerInterface>()
-
-    layersConfiguration.add(LayerInterface(size = inputSize, type = LayerType.Input.Dense))
-
-    layersConfiguration.addAll((0 until recurrentLayers).map {
-      LayerInterface(
-        size = recurrentHiddenSize,
-        activationFunction = recurrentHiddenActivation,
-        connectionType = recurrentConnectionType,
-        dropout = recurrentHiddenDropout
-      )})
-
-    this.recurrentNetwork = StackedLayersParameters(
-      layersConfiguration = *layersConfiguration.toTypedArray(),
-      weightsInitializer = weightsInitializer,
-      biasesInitializer = biasesInitializer)
-
-    (this.recurrentNetwork.paramsPerLayer.last() as? LSTMLayerParameters)?.initForgetGateBiasToOne()
-
-    this.classifier = StackedLayersParameters(
-      LayerInterface(
-        size = this.recurrentNetwork.outputSize,
-        type = LayerType.Input.Dense),
-      LayerInterface(
-        size = this.classifierOutputSize,
-        activationFunction = Softmax(),
-        connectionType = LayerType.Connection.Feedforward),
-      weightsInitializer = weightsInitializer,
-      biasesInitializer = biasesInitializer)
-
-    this.charsDict.getElements().forEach { char ->
-      if (char != ETX) this.charsEmbeddings.set(char)
+    require(numOfRecurrentLayers > 0) { "The number of recurrent layers must be > 0." }
+    require(recurrentConnection.property == LayerType.Property.Recurrent) {
+      "The connection type must be recurrent."
     }
+
+    require(!this.charsDict.contains(UNK)) { "The chars dictionary cannot contain the special UNK char." }
+    require(!this.charsDict.contains(ETX)) { "The chars dictionary cannot contain the special ETX char." }
+
+    this.charsDict.add(UNK)
+    this.charsDict.add(ETX)
+
+    this.charsDict.getElements().forEach { this.charsEmbeddings.set(it) }
   }
 
   /**
    * @param c a char
    *
-   * @return the id of the char [c] in the dictionary (or the unknown-id if it does not exist)
+   * @return the id of the char [c] if present in the dictionary, otherwise the id of the unknown char
    */
   fun getCharId(c: Char): Int = this.charsDict.getId(c) ?: this.unkCharId
 
   /**
-   * @param id an id
+   * @param id a char id
    *
-   * @return the char corresponding to the [id]
+   * @return the char with the given [id]
    */
   fun getChar(id: Int): Char = this.charsDict.getElement(id)!!
 
