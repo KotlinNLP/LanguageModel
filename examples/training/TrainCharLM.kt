@@ -18,7 +18,7 @@ import com.xenomachina.argparser.mainBody
 import java.io.File
 
 /**
- * Train and validate a [CharLM] model.
+ * Train a [CharLM] model.
  *
  * Launch with the '-h' option for help about the command line arguments.
  */
@@ -47,18 +47,17 @@ fun main(args: Array<String>) = mainBody {
     recurrentHiddenActivation = Tanh,
     recurrentLayers = 1)
 
-  val trainer = Trainer(
+  println("\n-- START TRAINING")
+
+  Trainer(
     model = model,
     modelFilename = parsedArgs.modelPath,
-    sentences = getLinesSequence(file = corpusFile, reverseChars = parsedArgs.reverse),
-    batchSize = 50,
+    sentences = getLinesSequence(file = corpusFile, reverseChars = parsedArgs.reverse).asIterable(),
+    charsBatchesSize = 50,
     charsDropout = 0.25,
     gradientClipping = GradientClipping.byValue(0.25),
-    epochs = 1,
-    updateMethod = RADAMMethod(stepSize = 0.001, beta1 = 0.9, beta2 = 0.999),
-    verbose = true)
-
-  trainer.train()
+    updateMethod = RADAMMethod(stepSize = 0.001, beta1 = 0.9, beta2 = 0.999)
+  ).train()
 }
 
 /**
