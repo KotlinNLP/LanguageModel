@@ -15,48 +15,54 @@ import com.kotlinnlp.simplednn.core.neuralprocessor.embeddingsprocessor.Embeddin
 import com.kotlinnlp.simplednn.core.neuralprocessor.recurrent.RecurrentNeuralProcessor
 import com.kotlinnlp.simplednn.core.optimizer.ParamsErrorsList
 import com.kotlinnlp.simplednn.core.optimizer.ParamsOptimizer
+import com.kotlinnlp.simplednn.helpers.Trainer as TrainingHelper
 import com.kotlinnlp.simplednn.simplemath.ndarray.dense.DenseNDArray
 import com.kotlinnlp.simplednn.simplemath.ndarray.dense.DenseNDArrayFactory
 import com.kotlinnlp.simplednn.simplemath.safeLog
-import com.kotlinnlp.simplednn.utils.scheduling.BatchScheduling
-import com.kotlinnlp.simplednn.utils.scheduling.EpochScheduling
-import com.kotlinnlp.simplednn.utils.scheduling.ExampleScheduling
 import com.kotlinnlp.utils.Timer
 import com.kotlinnlp.utils.stats.MovingAverage
 import java.io.File
 import java.io.FileOutputStream
 import kotlin.math.exp
-import kotlin.math.min
 
 /**
- * Class responsible for the performance of training process in epochs.
+ * The trainer of a [CharLM].
  *
  * @param model the model
  * @param modelFilename where to save the serialized model
  * @param sentences the training sentences
- * @param epochs number of training epochs
- * @param batchSize the size of each characters batch
+ * @param charsBatchesSize the max size of each batch
  * @param charsDropout the chars embeddings dropout
  * @param gradientClipping the gradient clipper
- * @param updateMethod the update method (e.g. ADAM, AdaGrad, LearningRate
- * @param verbose whether to display info during the training
+ * @param updateMethod the update method (e.g. ADAM, AdaGrad, LearningRate)
  */
 class Trainer(
   private val model: CharLM,
-  private val modelFilename: String,
-  private val sentences: Sequence<String>,
-  private val epochs: Int,
-  private val batchSize: Int,
+  modelFilename: String,
+  sentences: Iterable<String>,
+  private val charsBatchesSize: Int,
   private val charsDropout: Double,
-  private val gradientClipping: GradientClipping?,
-  private val updateMethod: UpdateMethod<*>,
-  private val verbose: Boolean = true
+  gradientClipping: GradientClipping?,
+  updateMethod: UpdateMethod<*>
+) : TrainingHelper<String>(
+  modelFilename = modelFilename,
+  optimizers = listOf(ParamsOptimizer(updateMethod = updateMethod, gradientClipping = gradientClipping)),
+  examples = sentences,
+  epochs = 1,
+  batchSize = 1,
+  evaluator = null,
+  shuffler = null,
+  verbose = false
 ) {
 
   /**
-   * A timer to track the elapsed time.
+   * A batch of characters representing a training example.
+   *
+   * @param text the text of the batch
+   * @param nextChar the char that follows the batch or `null` if this batch is the last of the sentence
+   * @param isSentenceStart `true` if this is the first batch of a sentence, otherwise `false`
    */
-  private var timer = Timer()
+  data class CharsBatch(val text: String, val nextChar: Char?, val isSentenceStart: Boolean)
 
   /**
    * The processor of the input network.
@@ -83,12 +89,7 @@ class Trainer(
     propagateToInput = true)
 
   /**
-   * Used to update the [CharLM] parameters based on the backward errors.
-   */
-  private val optimizer = ParamsOptimizer(updateMethod = this.updateMethod, gradientClipping = this.gradientClipping)
-
-  /**
-   *
+   * Support to save the initial hidden arrays during the batch learning.
    */
   private lateinit var initHiddens: List<List<DenseNDArray>>
 
@@ -103,72 +104,100 @@ class Trainer(
   private var bestLossMean: Double? = null
 
   /**
-   * Check requirements.
+   * The number of sentences seen at a given time.
    */
-  init {
-    require(this.epochs > 0) { "The number of epochs must be > 0" }
-  }
+  private var sentencesCount = 0
 
   /**
-   * Start the training.
+   * A timer to track the elapsed time.
    */
-  fun train() {
+  private val timer = Timer()
 
-    (0 until this.epochs).forEach { i ->
+  /**
+   * Function disabled, an explicit call to [accumulateBatchErrors] is made instead.
+   */
+  override fun accumulateErrors() = Unit
 
-      this.logTrainingStart(epochIndex = i)
+  /**
+   * Function disabled, an explicit call to [evaluateAndSaveModel] is made instead.
+   */
+  override fun dumpModel() = Unit
 
-      this.newEpoch()
-      this.trainEpoch()
+  /**
+   * Learn from a single sentence (forward + backward).
+   *
+   * @param example a training sentence
+   */
+  override fun learnFromExample(example: String) {
 
-      this.logTrainingEnd()
+    this.sentencesCount++
+
+    example.toBatches().forEach {
+      this.learnFromBatch(it)
+      this.accumulateBatchErrors()
+    }
+
+    if (this.sentencesCount % 10 == 0) print(".")
+
+    if (this.sentencesCount % 100 == 0) {
+      this.printProgress()
+      this.evaluateAndSaveModel() // TODO: model saved before the last update
     }
   }
 
   /**
-   * Function responsible for the single-epoch training step.
+   * Learn from a single chars batch (forward + backward).
    *
-   * Each epoch trains the model based on the given training sentences.
-   * Each time a best value is reached (i.e. higher score), the model trained so far
-   * is saved.
+   * @param batch a chars batch
    */
-  private fun trainEpoch() {
+  private fun learnFromBatch(batch: CharsBatch) {
 
-    this.sentences
-      .filter { it.isNotEmpty() }
-      .forEachIndexed { i, sentence ->
+    val predictions: List<DenseNDArray> = this.outputProcessor.forward(
+      this.hiddenProcessors.forward(
+        input = this.inputProcessor.forward(batch.text.toList()),
+        initHiddens = if (batch.isSentenceStart) null else this.initHiddens))
 
-        this.trainSentence(sentence)
+    this.initHiddens = this.hiddenProcessors.map { it.getCurState(copy = true)!! }
 
-        this.optimizer.update()
+    // The target is always the next character.
+    val lastCharId: Int = batch.nextChar?.let { this.model.getCharId(batch.nextChar)} ?: this.model.etxCharId
+    val targets: List<DenseNDArray> = batch.text.indices.map { i ->
+      DenseNDArrayFactory.oneHotEncoder(
+        length = this.model.classifier.outputSize,
+        oneAt = if (i == batch.text.lastIndex) lastCharId else this.model.getCharId(batch.text[i + 1]))
+    }
 
-        if ((i + 1) % 100 == 0) {
-          this.printProgress(sentencesCount = i + 1)
-          this.evaluateAndSaveModel()
+    val errors: List<DenseNDArray> =
+      SoftmaxCrossEntropyCalculator.calculateErrors(outputSequence = predictions, outputGoldSequence = targets)
+
+    this.inputProcessor.backward(
+      this.hiddenProcessors.backwardAndGetInputErrors(
+        this.outputProcessor.let {
+          it.backward(errors)
+          it.getInputErrors(copy = false)
         }
+      )
+    )
 
-        if ((i + 1) % 10 == 0) print(".")
-      }
+    predictions.zip(targets).forEach { (prediction, target) ->
+      this.avgLoss.add(-safeLog(prediction[target.argMaxIndex()]))
+    }
   }
 
   /**
-   * Print the current progress.
-   *
-   * @param sentencesCount the number of sentences seen
+   * Accumulate the errors of the model resulting after the call of [learnFromBatch].
    */
-  private fun printProgress(sentencesCount: Int) {
+  private fun accumulateBatchErrors() {
 
-    print("\n[%s] After %d sentences: loss mean = %.2f, std dev = %.2f"
-      .format(this.timer.formatElapsedTime(), sentencesCount, this.avgLoss.calcMean(), this.avgLoss.calcStdDev()))
+    val paramsErrors: ParamsErrorsList = this.inputProcessor.getParamsErrors(copy = false) +
+      this.hiddenProcessors.flatMap { it.getParamsErrors(copy = false) } +
+      this.outputProcessor.getParamsErrors(copy = false)
 
-    if (this.bestLossMean != null)
-      println(" (former best = %.2f)".format(this.bestLossMean))
-    else
-      println()
+    this.optimizers.first().accumulate(paramsErrors)
   }
 
   /**
-   * Evaluate and save the best model.
+   * Evaluate the model and save it if it is the best.
    */
   private fun evaluateAndSaveModel() {
 
@@ -186,142 +215,56 @@ class Trainer(
   }
 
   /**
-   * Train a single sentence.
+   * Print the current progress.
+   */
+  private fun printProgress() {
+
+    print("\n[${this.timer.formatElapsedTime()}] After ${this.sentencesCount} sentences: " +
+      "loss mean = %.2f, std dev = %.2f".format(this.avgLoss.calcMean(), this.avgLoss.calcStdDev()))
+
+    if (this.bestLossMean != null)
+      println(" (former best = %.2f)".format(this.bestLossMean))
+    else
+      println()
+  }
+
+  /**
+   * Convert this string to a sequence of [Trainer.CharsBatch], splitting it in batches with a max size.
    *
-   * @param sentence the sentence
+   * @return a sequence of training bathes
    */
-  private fun trainSentence(sentence: String) {
+  private fun String.toBatches(): Sequence<CharsBatch> = sequence {
 
-    if (sentence.contains(CharLM.ETX) || sentence.contains(CharLM.UNK)) {
-      throw RuntimeException("The String can't contain NULL or ETX chars")
-    }
+    val str: String = this@toBatches
+    val maxSize: Int = this@Trainer.charsBatchesSize
 
-    var start = 0
+    if (str.isNotBlank()) {
 
-    while (start < sentence.length) {
+      if (str.contains(CharLM.ETX) || str.contains(CharLM.UNK))
+        throw RuntimeException("The training sentence cannot contain the NULL or ETX chars")
 
-      val end: Int = min(start + this.batchSize, sentence.length)
-      val nextChar: Char? = if (end < sentence.length) sentence[end] else null
+      var start = 0
 
-      this.newBatch()
-      this.newExample()
+      while (start < str.length) {
 
-      this.trainBatch(batch = sentence.substring(start, end), nextChar = nextChar, isFirst = start == 0)
+        val end: Int = (start + maxSize).coerceAtMost(str.length)
+        val nextChar: Char? = if (end < str.length) str[end] else null
 
-      start = end
+        yield(CharsBatch(text = str.substring(start, end), nextChar = nextChar, isSentenceStart = start == 0))
+
+        start = end
+      }
     }
   }
 
-  /**
-   * Train a batch of characters.
-   *
-   * @param batch a characters batch
-   * @param nextChar the char that follows the batch or null if the batch is the last of the sentence
-   * @param isFirst whether it is the first batch
-   */
-  private fun trainBatch(batch: String, nextChar: Char?, isFirst: Boolean) {
-
-    val predictions: List<DenseNDArray> = this.outputProcessor.forward(
-      this.hiddenProcessors.forward(
-        input = this.inputProcessor.forward(batch.toList()),
-        initHiddens = if (isFirst) null else this.initHiddens))
-
-    this.initHiddens = this.hiddenProcessors.map { it.getCurState(copy = true)!! }
-
-    // The target is always the next character.
-    val lastCharId: Int = nextChar?.let { this.model.getCharId(nextChar)} ?: this.model.etxCharId
-    val targets: List<DenseNDArray> = batch.indices.map { i ->
-      DenseNDArrayFactory.oneHotEncoder(
-        length = this.model.classifier.outputSize,
-        oneAt = if (i == batch.lastIndex) lastCharId else this.model.getCharId(batch[i + 1]))
-    }
-
-    val errors: List<DenseNDArray> = SoftmaxCrossEntropyCalculator.calculateErrors(
-      outputSequence = predictions,
-      outputGoldSequence = targets)
-
-    this.inputProcessor.backward(
-      this.hiddenProcessors.backwardAndGetInputErrors(
-        this.outputProcessor.let {
-          it.backward(errors)
-          it.getInputErrors(copy = false)
-        }
-      )
-    )
-
-    val paramsErrors: ParamsErrorsList = this.inputProcessor.getParamsErrors(copy = false) +
-      this.hiddenProcessors.flatMap { it.getParamsErrors(copy = false) } +
-      this.outputProcessor.getParamsErrors(copy = false)
-
-    this.optimizer.accumulate(paramsErrors)
-
-    predictions.zip(targets).forEach { (prediction, target) ->
-      this.avgLoss.add(-safeLog(prediction[target.argMaxIndex()]))
-    }
-  }
 
   /**
-   * Beat the occurrence of a new example.
-   */
-  private fun newExample() {
-
-    if (this.updateMethod is ExampleScheduling) {
-      this.updateMethod.newExample()
-    }
-  }
-
-  /**
-   * Beat the occurrence of a new batch.
-   */
-  private fun newBatch() {
-
-    if (this.updateMethod is BatchScheduling) {
-      this.updateMethod.newBatch()
-    }
-  }
-
-  /**
-   * Beat the occurrence of a new epoch.
-   */
-  private fun newEpoch() {
-
-    if (this.updateMethod is EpochScheduling) {
-      this.updateMethod.newEpoch()
-    }
-  }
-
-  /**
-   * Log when training starts.
-   *
-   * @param epochIndex the current epoch index
-   */
-  private fun logTrainingStart(epochIndex: Int) {
-
-    if (this.verbose) {
-
-      this.timer.reset()
-
-      println("\nEpoch ${epochIndex + 1} of ${this.epochs}")
-      println("\nStart training...")
-    }
-  }
-
-  /**
-   * Log when training ends.
-   */
-  private fun logTrainingEnd() {
-
-    if (this.verbose) {
-      println("Elapsed time: %s".format(this.timer.formatElapsedTime()))
-    }
-  }
-
-  /**
-   * Perform the forward of the hidden processors.
+   * Execute the forward of the hidden processors.
    *
    * @param input the input
+   * @param initHiddens the initial hidden arrays
    *
-   * @return the result of the forward
+   * @return the output arrays
    */
   private fun List<RecurrentNeuralProcessor<DenseNDArray>>.forward(
     input: List<DenseNDArray>,
