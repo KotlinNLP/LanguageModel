@@ -33,7 +33,6 @@ import java.io.Serializable
  * @param charsDict the dictionary containing the known characters (used both for embeddings and for prediction output)
  * @param charsEmbeddingsSize the size of the chars embeddings (default 25)
  * @param recurrentHiddenSize the size of the recurrent hidden layers (default 200)
- * @param recurrentHiddenDropout the dropout of the recurrent hidden layers (used during training only, default 0.0)
  * @param recurrentConnection the recurrent connection type (e.g. LSTM -default-, GRU, RAN, etc...)
  * @param recurrentHiddenActivation the activation function of the recurrent layers (default [Tanh])
  * @param numOfRecurrentLayers the number of recurrent layers (default 1)
@@ -44,7 +43,6 @@ class CharLM(
   private val charsDict: DictionarySet<Char>,
   charsEmbeddingsSize: Int = 25,
   recurrentHiddenSize: Int = 200,
-  recurrentHiddenDropout: Double = 0.0,
   recurrentConnection: LayerType.Connection = LayerType.Connection.LSTM,
   recurrentHiddenActivation: ActivationFunction? = Tanh,
   numOfRecurrentLayers: Int = 1,
@@ -95,8 +93,7 @@ class CharLM(
       LayerInterface(
         size = recurrentHiddenSize,
         activationFunction = recurrentHiddenActivation,
-        connectionType = recurrentConnection,
-        dropout = recurrentHiddenDropout
+        connectionType = recurrentConnection
       )},
     weightsInitializer = weightsInitializer,
     biasesInitializer = biasesInitializer

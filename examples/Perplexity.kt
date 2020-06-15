@@ -69,11 +69,5 @@ private fun readValue(): String? {
  */
 private fun buildProcessor(model: CharLM) = ChainProcessor(
   inputProcessor = EmbeddingsProcessor(model.charsEmbeddings),
-  hiddenProcessors = listOf(RecurrentNeuralProcessor(
-    model = model.hiddenNetwork,
-    useDropout = false,
-    propagateToInput = false)),
-  outputProcessor = BatchFeedforwardProcessor(
-    model = model.outputClassifier,
-    useDropout = false,
-    propagateToInput = false))
+  hiddenProcessors = listOf(RecurrentNeuralProcessor(model = model.hiddenNetwork, propagateToInput = false)),
+  outputProcessor = BatchFeedforwardProcessor(model = model.outputClassifier, propagateToInput = false))

@@ -32,7 +32,9 @@ import kotlin.math.exp
  * @param modelFilename where to save the serialized model
  * @param sentences the training sentences
  * @param charsBatchesSize the max size of each batch
- * @param charsDropout the chars embeddings dropout
+ * @param charsDropout the dropout probability of the chars embeddings (default 0.0)
+ * @param hiddenDropout the dropout of the hidden encoder (default 0.0)
+ * @param classifierDropout the dropout of the output classifier (default 0.0)
  * @param gradientClipping the gradient clipper
  * @param updateMethod the update method (e.g. ADAM, AdaGrad, LearningRate)
  */
@@ -41,7 +43,9 @@ class Trainer(
   modelFilename: String,
   sentences: Iterable<String>,
   private val charsBatchesSize: Int,
-  private val charsDropout: Double,
+  charsDropout: Double = 0.0,
+  hiddenDropout: Double = 0.0,
+  classifierDropout: Double = 0.0,
   gradientClipping: GradientClipping?,
   updateMethod: UpdateMethod<*>
 ) : TrainingHelper<String>(
@@ -84,19 +88,19 @@ class Trainer(
    * The input embeddings processor.
    */
   private val embProcessor: EmbeddingsProcessor<Char> =
-    EmbeddingsProcessor(embeddingsMap = this.model.charsEmbeddings, dropout = this.charsDropout)
+    EmbeddingsProcessor(embeddingsMap = this.model.charsEmbeddings, dropout = charsDropout)
 
   /**
    * The hidden processor to auto-encode the input.
    */
   private val hiddenProcessor: RecurrentNeuralProcessor<DenseNDArray> =
-    RecurrentNeuralProcessor(model = this.model.hiddenNetwork, useDropout = true, propagateToInput = true)
+    RecurrentNeuralProcessor(model = this.model.hiddenNetwork, dropout = hiddenDropout, propagateToInput = true)
 
   /**
    * The output classifier.
    */
   private val outputClassifier: BatchFeedforwardProcessor<DenseNDArray> =
-    BatchFeedforwardProcessor(model = this.model.outputClassifier, useDropout = true, propagateToInput = true)
+    BatchFeedforwardProcessor(model = this.model.outputClassifier, dropout = classifierDropout, propagateToInput = true)
 
   /**
    * Support to save the initial hidden arrays during the batch learning.

@@ -23,14 +23,14 @@ internal class RandomWeightedChoicePredictor(private val model: CharLM) {
   /**
    * The recurrent hidden processor that encodes a character at time.
    */
-  private val hiddenProcessor: RecurrentNeuralProcessor<DenseNDArray> =
-    RecurrentNeuralProcessor(model = this.model.hiddenNetwork, useDropout = false, propagateToInput = false)
+  private val hiddenProcessor =
+    RecurrentNeuralProcessor<DenseNDArray>(model = this.model.hiddenNetwork, propagateToInput = false)
 
   /**
    * The classifier that predicts the next character of the sequence.
    */
-  private val outputClassifier: FeedforwardNeuralProcessor<DenseNDArray> =
-    FeedforwardNeuralProcessor(model = this.model.outputClassifier, useDropout = false, propagateToInput = false)
+  private val outputClassifier =
+    FeedforwardNeuralProcessor<DenseNDArray>(model = this.model.outputClassifier, propagateToInput = false)
 
   /**
    * Predict the continuation of a characters sequence, based on the given language model.
