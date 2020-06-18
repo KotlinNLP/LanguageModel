@@ -59,7 +59,7 @@
         <gpg.keyname>C73F18F0</gpg.keyname>
         <kotlin.version>1.3.31</kotlin.version>
         <dokka.version>0.9.16</dokka.version>
-        <simplednn.version>0.14.0</simplednn.version>
+        <simplednn.version>0.14.1</simplednn.version>
     </properties>
 
     <repositories>
